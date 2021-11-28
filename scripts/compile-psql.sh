@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Expected format:
-# sudo ./compile-pgsql full_path_sql_script ramen_sql_root_path [official_sql_root_path]
+:'  Expected format:
+    sudo ./compile-pgsql full_path_sql_script ramen_sql_root_path [official_sql_root_path] '
+
+
+
 
 
 function main {
@@ -48,6 +51,7 @@ function error_quit {
 }
 
 function make_pgsql {
+    #./configure : 'uncomment if you haver never compiled it before.'
     make || error_quit
     sudo make install || error_quit
 }
@@ -59,18 +63,22 @@ function run_pgsql {
     setfacl -m u:postgres:rwx "${SQL_SCRIPT}"
     su postgres << EOSU
     echo "--- init"
-    /usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data
+    /usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data || exit
     echo "--- pg_crl start"
-    /usr/local/pgsql/bin/pg_ctl -D /usr/local/pgsql/data start
+    /usr/local/pgsql/bin/pg_ctl -D /usr/local/pgsql/data start || exit
     echo "--- createdb"
-    /usr/local/pgsql/bin/createdb sushi
+    /usr/local/pgsql/bin/createdb sushi || exit
     echo "--- psql w/ script"
-    /usr/local/pgsql/bin/psql -d sushi -f "${SQL_SCRIPT}"
+    echo ""
+    echo ""
+    /usr/local/pgsql/bin/psql -d sushi -f "${SQL_SCRIPT}" || exit
+    echo ""
+    echo ""
     echo "--- drop"
-    /usr/local/pgsql/bin/dropdb sushi
+    /usr/local/pgsql/bin/dropdb sushi || exit
     echo "--- stop"
-    /usr/local/pgsql/bin/pg_ctl stop  
-    sleep 10
+    /usr/local/pgsql/bin/pg_ctl stop  -D /usr/local/pgsql/data -m fast || exit
+    sleep 5
 EOSU
 }
 
