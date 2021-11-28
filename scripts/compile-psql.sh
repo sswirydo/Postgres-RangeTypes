@@ -30,6 +30,7 @@ function check_arguments {
     then
         echo "Incorrect program format."
         echo "Expected: sudo ./compile-pgsql full_path_sql_script ramen_sql_root_path [official_sql_root_path]"
+        exit
     fi
 }
 
