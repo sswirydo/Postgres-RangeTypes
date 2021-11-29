@@ -2850,7 +2850,7 @@ neqjoinsel(PG_FUNCTION_ARGS)
  *		scalarltjoinsel - Join selectivity of "<" for scalars
  */
 Datum
-scalarltjoinsel(PG_FUNCTION_ARGS)
+scalarltjoinsel(PG_FUNCTION_ARGS) // szymon: créer un nvx ltjoinsel pour les range
 {
 	PG_RETURN_FLOAT8(DEFAULT_INEQ_SEL);
 }

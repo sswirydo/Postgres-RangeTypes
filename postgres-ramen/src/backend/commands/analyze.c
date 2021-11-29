@@ -120,8 +120,6 @@ analyze_rel(Oid relid, RangeVar *relation,
 			VacuumParams *params, List *va_cols, bool in_outer_xact,
 			BufferAccessStrategy bstrategy)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);	
 
 	Relation	onerel;
 	int			elevel;
@@ -305,9 +303,7 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 			   BlockNumber relpages, bool inh, bool in_outer_xact,
 			   int elevel)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
-
+	
 	int			attr_cnt,
 				tcnt,
 				i,
@@ -556,9 +552,7 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 			stats->rows = rows;
 			stats->tupDesc = onerel->rd_att;
 
-			printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-			fflush(stdout);
-
+			FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "compute_stats(...) call"); fclose(file);
 			stats->compute_stats(stats,
 								 std_fetch_func,
 								 numrows,
@@ -581,11 +575,14 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 			MemoryContextResetAndDeleteChildren(col_context);
 		}
 
-		if (hasindex)
+		if (hasindex){
+			FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "compute_index_stats(...) call"); fclose(file);
 			compute_index_stats(onerel, totalrows,
 								indexdata, nindexes,
 								rows, numrows,
 								col_context);
+		}
+			
 
 		MemoryContextSwitchTo(old_context);
 		MemoryContextDelete(col_context);
@@ -746,7 +743,6 @@ compute_index_stats(Relation onerel, double totalrows,
 					MemoryContext col_context)
 {
 	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	MemoryContext ind_context,
 				old_context;
@@ -916,9 +912,6 @@ compute_index_stats(Relation onerel, double totalrows,
 static VacAttrStats *
 examine_attribute(Relation onerel, int attnum, Node *index_expr)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
-
 	Form_pg_attribute attr = TupleDescAttr(onerel->rd_att, attnum - 1);
 	HeapTuple	typtuple;
 	VacAttrStats *stats;
@@ -1052,8 +1045,6 @@ acquire_sample_rows(Relation onerel, int elevel,
 					HeapTuple *rows, int targrows,
 					double *totalrows, double *totaldeadrows)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	int			numrows = 0;	/* # rows now in reservoir */
 	double		samplerows = 0; /* total # rows collected */
@@ -1201,8 +1192,6 @@ acquire_sample_rows(Relation onerel, int elevel,
 static int
 compare_rows(const void *a, const void *b)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	HeapTuple	ha = *(const HeapTuple *) a;
 	HeapTuple	hb = *(const HeapTuple *) b;
@@ -1236,8 +1225,6 @@ acquire_inherited_sample_rows(Relation onerel, int elevel,
 							  HeapTuple *rows, int targrows,
 							  double *totalrows, double *totaldeadrows)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	List	   *tableOIDs;
 	Relation   *rels;
@@ -1482,8 +1469,6 @@ acquire_inherited_sample_rows(Relation onerel, int elevel,
 static void
 update_attstats(Oid relid, bool inh, int natts, VacAttrStats **vacattrstats)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	Relation	sd;
 	int			attno;
@@ -1624,8 +1609,6 @@ update_attstats(Oid relid, bool inh, int natts, VacAttrStats **vacattrstats)
 static Datum
 std_fetch_func(VacAttrStatsP stats, int rownum, bool *isNull)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	int			attnum = stats->tupattnum;
 	HeapTuple	tuple = stats->rows[rownum];
@@ -1643,8 +1626,6 @@ std_fetch_func(VacAttrStatsP stats, int rownum, bool *isNull)
 static Datum
 ind_fetch_func(VacAttrStatsP stats, int rownum, bool *isNull)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	int			i;
 
@@ -1723,9 +1704,6 @@ static int	analyze_mcv_list(int *mcv_counts,
 bool
 std_typanalyze(VacAttrStats *stats)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
-
 	Form_pg_attribute attr = stats->attr;
 	Oid			ltopr;
 	Oid			eqopr;
@@ -1809,8 +1787,6 @@ compute_trivial_stats(VacAttrStatsP stats,
 					  int samplerows,
 					  double totalrows)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	int			i;
 	int			null_cnt = 0;
@@ -1902,8 +1878,6 @@ compute_distinct_stats(VacAttrStatsP stats,
 					   int samplerows,
 					   double totalrows)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	int			i;
 	int			null_cnt = 0;
@@ -2248,8 +2222,6 @@ compute_scalar_stats(VacAttrStatsP stats,
 					 int samplerows,
 					 double totalrows)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	int			i;
 	int			null_cnt = 0;
@@ -2777,8 +2749,6 @@ compute_scalar_stats(VacAttrStatsP stats,
 static int
 compare_scalars(const void *a, const void *b, void *arg)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	Datum		da = ((const ScalarItem *) a)->value;
 	int			ta = ((const ScalarItem *) a)->tupno;
@@ -2811,8 +2781,6 @@ compare_scalars(const void *a, const void *b, void *arg)
 static int
 compare_mcvs(const void *a, const void *b)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	int			da = ((const ScalarMCVItem *) a)->first;
 	int			db = ((const ScalarMCVItem *) b)->first;
@@ -2837,9 +2805,6 @@ analyze_mcv_list(int *mcv_counts,
 				 int samplerows,
 				 double totalrows)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
-
 	double		ndistinct_table;
 	double		sumcount;
 	int			i;

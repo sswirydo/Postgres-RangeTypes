@@ -15,6 +15,10 @@ function main {
         cd "$2"
         make_pgsql || error_quit "make"
         run_pgsql || error_quit "run"
+
+        sudo rm ${RAMEN_PATH}/ramendata/sushiOUT.txt || echo "rip sushi rm"
+        sudo cp /usr/local/pgsql/data/sushiOUT.txt ${RAMEN_PATH}/ramendata/ || echo "rip sushi cp"
+
         cd "${current_path}"
     fi
 
@@ -52,7 +56,7 @@ function error_quit {
 }
 
 function make_pgsql {
-    #./configure : 'uncomment if you haver never compiled it before.'
+    # ./configure --enable-cassert --enable-debug CFLAGS="-ggdb -Og -g3 -fno-omit-frame-pointer" : 'uncomment if you haver never compiled it before.'
     make || error_quit "make"
     sudo make install || error_quit "make install"
 }
@@ -66,17 +70,17 @@ function run_pgsql {
     echo "--- init"
     /usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data || exit
     echo "--- pg_crl start"
-    /usr/local/pgsql/bin/pg_ctl -D /usr/local/pgsql/data start || exit
+    /usr/local/pgsql/bin/pg_ctl -D /usr/local/pgsql/data start  || exit
     echo "--- createdb"
-    /usr/local/pgsql/bin/createdb sushi || exit
+    /usr/local/pgsql/bin/createdb sushi
     echo "--- psql w/ script"
     echo ""
     echo ""
-    /usr/local/pgsql/bin/psql -d sushi -f "${SQL_SCRIPT}" > ${RAMEN_PATH}/PATATSQL.txt 2>${RAMEN_PATH}/PATAERROR.txt|| exit 
+    /usr/local/pgsql/bin/psql -d sushi -f "${SQL_SCRIPT}" --echo-hidden
     echo ""
     echo ""
     echo "--- drop"
-    /usr/local/pgsql/bin/dropdb sushi || exit
+    /usr/local/pgsql/bin/dropdb sushi
     echo "--- stop"
     /usr/local/pgsql/bin/pg_ctl stop  -D /usr/local/pgsql/data -m fast || exit
     sleep 5

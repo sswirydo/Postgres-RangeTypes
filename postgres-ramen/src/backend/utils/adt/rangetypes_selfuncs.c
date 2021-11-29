@@ -384,9 +384,6 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
 	bool		empty;
 	double		hist_selec;
 
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
-
 	/* Can't use the histogram with insecure range support functions */
 	if (!statistic_proc_security_check(vardata,
 									   typcache->rng_cmp_proc_finfo.fn_oid))
@@ -602,9 +599,6 @@ calc_hist_selectivity_scalar(TypeCacheEntry *typcache, const RangeBound *constbo
 	Selectivity selec;
 	int			index;
 
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
-
 	/*
 	 * Find the histogram bin the given constant falls into. Estimate
 	 * selectivity as the number of preceding whole bins.
@@ -639,9 +633,6 @@ rbound_bsearch(TypeCacheEntry *typcache, const RangeBound *value, const RangeBou
 				cmp,
 				middle;
 
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
-
 	while (lower < upper)
 	{
 		middle = (lower + upper + 1) / 2;
@@ -669,9 +660,6 @@ length_hist_bsearch(Datum *length_hist_values, int length_hist_nvalues,
 	int			lower = -1,
 				upper = length_hist_nvalues - 1,
 				middle;
-
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	while (lower < upper)
 	{

@@ -20,6 +20,12 @@
 
 #include "utils/builtins.h"
 #include "utils/geo_decls.h"
+#include "catalog/pg_operator.h"
+#include "commands/vacuum.h"
+#include "utils/float.h"
+#include "utils/fmgrprotos.h"
+#include "utils/lsyscache.h"
+#include "utils/rangetypes.h"
 
 
 /*
@@ -45,16 +51,26 @@
  * Selectivity for operators that depend on area, such as "overlap".
  */
 
-Datum
-areasel(PG_FUNCTION_ARGS)
-{
 
+Datum
+areasel(PG_FUNCTION_ARGS) //alex: on s'en fout de celui ci
+{
 	PG_RETURN_FLOAT8(0.005);
 }
 
+// alex: on utilise celui-ci pour des datums
 Datum
-areajoinsel(PG_FUNCTION_ARGS)
+areajoinsel(PG_FUNCTION_ARGS) // szymon: on veut celui-ci
 {
+	printf("ok2");
+	fflush(stdout);
+	VacAttrStats *stats = (VacAttrStats *) PG_GETARG_POINTER(0);
+	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
+	for(int i = 0; i < 100; i++){
+		printf("histogram2 %s\n",stats->stavalues[i]);
+		fflush(stdout);
+	}
+	
 	PG_RETURN_FLOAT8(0.005);
 }
 

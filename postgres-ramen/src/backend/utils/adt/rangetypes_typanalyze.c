@@ -42,8 +42,9 @@ static void compute_range_stats(VacAttrStats *stats,
 Datum
 range_typanalyze(PG_FUNCTION_ARGS)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
+	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "1"); fclose(file);
+	file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "2"); fclose(file);
+
 	VacAttrStats *stats = (VacAttrStats *) PG_GETARG_POINTER(0);
 	TypeCacheEntry *typcache;
 	Form_pg_attribute attr = stats->attr;
@@ -51,13 +52,13 @@ range_typanalyze(PG_FUNCTION_ARGS)
 	/* Get information about range type; note column might be a domain */
 	typcache = range_get_typcache(fcinfo, getBaseType(stats->attrtypid));
 
-	if (attr->attstattarget < 0)
+	if (attr->attstattarget < 0) // szymon: if empty
 		attr->attstattarget = default_statistics_target;
 
 	stats->compute_stats = compute_range_stats;
 	stats->extra_data = typcache;
 	/* same as in std_typanalyze */
-	stats->minrows = 300 * attr->attstattarget;
+	stats->minrows = 300 * attr->attstattarget; //alex: pq 300 fois ? 
 
 	PG_RETURN_BOOL(true);
 }
@@ -68,8 +69,6 @@ range_typanalyze(PG_FUNCTION_ARGS)
 static int
 float8_qsort_cmp(const void *a1, const void *a2)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	const float8 *f1 = (const float8 *) a1;
 	const float8 *f2 = (const float8 *) a2;
@@ -88,8 +87,6 @@ float8_qsort_cmp(const void *a1, const void *a2)
 static int
 range_bound_qsort_cmp(const void *a1, const void *a2, void *arg)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
 
 	RangeBound *b1 = (RangeBound *) a1;
 	RangeBound *b2 = (RangeBound *) a2;
@@ -105,8 +102,7 @@ static void
 compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 					int samplerows, double totalrows)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
-	fflush(stdout);
+	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
 
 	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
 	bool		has_subdiff = OidIsValid(typcache->rng_subdiff_finfo.fn_oid);
@@ -165,7 +161,9 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			lowers[non_empty_cnt] = lower;
 			uppers[non_empty_cnt] = upper;
 
-			if (lower.infinite || upper.infinite)
+
+			// -- szymon: cette partie on calcule la longueur par rapport aux lower and upper bounds -- //
+			if (lower.infinite || upper.infinite) // szymon: si range infinie, length infinie
 			{
 				/* Length of any kind of an infinite range is infinite */
 				length = get_float8_infinity();
@@ -200,6 +198,7 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 	/* We can only compute real stats if we found some non-null values. */
 	if (non_null_cnt > 0)
 	{
+		fflush(stdout);
 		Datum	   *bound_hist_values;
 		Datum	   *length_hist_values;
 		int			pos,
@@ -256,6 +255,8 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 			for (i = 0; i < num_hist; i++)
 			{
+				printf("mayo1\n");
+				// szymon: c'est ici qu'on combine les lower & upper histogrammes en 1
 				bound_hist_values[i] = PointerGetDatum(range_serialize(typcache,
 																	   &lowers[pos],
 																	   &uppers[pos],
@@ -270,16 +271,18 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 				}
 			}
 
+			// alex: c'est qui nous intéresse
 			stats->stakind[slot_idx] = STATISTIC_KIND_BOUNDS_HISTOGRAM;
 			stats->stavalues[slot_idx] = bound_hist_values;
 			stats->numvalues[slot_idx] = num_hist;
-			slot_idx++;
+			slot_idx++; // szymon: en gros slot_idx=0 -> bound_hist et slot_inx=1 -> lengths_hist
 		}
 
-		/*
+		/* // szymon: le histogram de longueurs
 		 * Generate a length histogram slot entry if there are at least two
 		 * values.
 		 */
+		 // alex: on verifie que c'est pas vide - null
 		if (non_empty_cnt >= 2)
 		{
 			/*
