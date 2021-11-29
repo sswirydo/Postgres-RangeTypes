@@ -16,6 +16,6 @@ Our modified version of postgreSQL. Why ramen? Cause why not, every one loves ra
 ### Debug printing
 Instead of printing with printf(...) etc., simply put this line in your code
 ```C
-FILE* file = fopen("sushiOUT.txt","w+"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
+FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
 ```
 which while add append everything into an output file in /postgres-ramen/ramendata/sushiOUT.txt
