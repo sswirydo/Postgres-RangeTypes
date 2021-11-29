@@ -50,29 +50,85 @@
 /*
  * Selectivity for operators that depend on area, such as "overlap".
  */
-
-
 Datum
 areasel(PG_FUNCTION_ARGS) //alex: on s'en fout de celui ci
 {
 	PG_RETURN_FLOAT8(0.005);
 }
 
+
+
+
+
+
+
 // alex: on utilise celui-ci pour des datums
 Datum
 areajoinsel(PG_FUNCTION_ARGS) // szymon: on veut celui-ci
 {
-	printf("ok2");
-	fflush(stdout);
-	VacAttrStats *stats = (VacAttrStats *) PG_GETARG_POINTER(0);
+
+	/* szymon: FOR MORE INFO, CHECK THE HEADER OF selfuncs.c
+	*	Selectivity oprjoin (PlannerInfo *root,
+    *						Oid operator,
+    *						List *args,
+    *						JoinType jointype,
+    *						SpecialJoinInfo *sjinfo);
+	*
+	* WHERE
+	* " root: general information about the query (rtable and RelOptInfo lists "
+ 	* " are particularly important for the estimator). "
+	* " operator: OID of the specific operator in question. "
+	* " args: argument list from the operator clause. "
+	* others: " in the comments for
+ 	* clause_selectivity() --- the short version is that jointype is usually
+ 	* best ignored in favor of examining sjinfo. "
+	*	
+	* " Join selectivity for regular inner and outer joins is defined as the
+	* fraction (0 to 1) of the cross product of the relations that is expected
+	* to produce a TRUE result for the given operator.  For both semi and anti
+	* joins, however, the selectivity is defined as the fraction of the left-hand
+	* side relation's rows that are expected to have a match (ie, at least one
+	* row with a TRUE result) in the right-hand side. "
+	*
+	* " For both oprrest and oprjoin functions, the operator's input collation OID
+	* (if any) is passed using the standard fmgr mechanism, so that the estimator
+	* function can fetch it with PG_GET_COLLATION().  Note, however, that all
+	* statistics in pg_statistic are currently built using the relevant column's
+	* collation. "
+	*/
+
+	
+	// szymon: possibles arguments qu'on peut récup.
+	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
+	Oid			operator = PG_GETARG_OID(1);
+	List	   *args = (List *) PG_GETARG_POINTER(2);
+	JoinType	jointype = (JoinType) PG_GETARG_INT16(3);
+	SpecialJoinInfo *sjinfo = (SpecialJoinInfo *) PG_GETARG_POINTER(4);
+
+	// VacAttrStats *stats = (VacAttrStats *) PG_GETARG_POINTER(0);
 	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
+	/*
 	for(int i = 0; i < 100; i++){
 		printf("histogram2 %s\n",stats->stavalues[i]);
 		fflush(stdout);
 	}
+	*/
 	
 	PG_RETURN_FLOAT8(0.005);
 }
+
+
+
+
+
+
+
+
+
+
+
+//szymon : osef de ce qu'il y a en dessous
+
 
 /*
  *	positionsel
