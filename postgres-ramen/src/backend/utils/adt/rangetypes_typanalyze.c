@@ -42,6 +42,8 @@ static void compute_range_stats(VacAttrStats *stats,
 Datum
 range_typanalyze(PG_FUNCTION_ARGS)
 {
+	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
+	fflush(stdout);
 	VacAttrStats *stats = (VacAttrStats *) PG_GETARG_POINTER(0);
 	TypeCacheEntry *typcache;
 	Form_pg_attribute attr = stats->attr;
@@ -66,6 +68,9 @@ range_typanalyze(PG_FUNCTION_ARGS)
 static int
 float8_qsort_cmp(const void *a1, const void *a2)
 {
+	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
+	fflush(stdout);
+
 	const float8 *f1 = (const float8 *) a1;
 	const float8 *f2 = (const float8 *) a2;
 
@@ -83,6 +88,9 @@ float8_qsort_cmp(const void *a1, const void *a2)
 static int
 range_bound_qsort_cmp(const void *a1, const void *a2, void *arg)
 {
+	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
+	fflush(stdout);
+
 	RangeBound *b1 = (RangeBound *) a1;
 	RangeBound *b2 = (RangeBound *) a2;
 	TypeCacheEntry *typcache = (TypeCacheEntry *) arg;
@@ -97,6 +105,9 @@ static void
 compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 					int samplerows, double totalrows)
 {
+	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
+	fflush(stdout);
+
 	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
 	bool		has_subdiff = OidIsValid(typcache->rng_subdiff_finfo.fn_oid);
 	int			null_cnt = 0;

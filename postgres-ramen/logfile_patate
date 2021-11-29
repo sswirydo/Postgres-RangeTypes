@@ -1,0 +1,10 @@
+2021-11-29 10:47:29.120 CET [5052] LOG:  starting PostgreSQL 13.5 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0, 64-bit
+2021-11-29 10:47:29.121 CET [5052] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2021-11-29 10:47:29.129 CET [5052] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
+2021-11-29 10:47:29.133 CET [5053] LOG:  database system was shut down at 2021-11-29 10:47:28 CET
+2021-11-29 10:47:29.137 CET [5052] LOG:  database system is ready to accept connections
+2021-11-29 10:47:29.660 CET [5052] LOG:  received fast shutdown request
+2021-11-29 10:47:29.662 CET [5052] LOG:  aborting any active transactions
+2021-11-29 10:47:29.663 CET [5052] LOG:  background worker "logical replication launcher" (PID 5059) exited with exit code 1
+2021-11-29 10:47:29.663 CET [5054] LOG:  shutting down
+2021-11-29 10:47:29.679 CET [5052] LOG:  database system is shut down

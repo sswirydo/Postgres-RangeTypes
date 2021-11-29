@@ -48,12 +48,13 @@ function check_root {
 
 function error_quit {
     echo "Error during $1"
+    exit
 }
 
 function make_pgsql {
     #./configure : 'uncomment if you haver never compiled it before.'
-    make || error_quit
-    sudo make install || error_quit
+    make || error_quit "make"
+    sudo make install || error_quit "make install"
 }
 
 function run_pgsql {
@@ -71,7 +72,7 @@ function run_pgsql {
     echo "--- psql w/ script"
     echo ""
     echo ""
-    /usr/local/pgsql/bin/psql -d sushi -f "${SQL_SCRIPT}" || exit
+    /usr/local/pgsql/bin/psql -d sushi -f "${SQL_SCRIPT}" > ${RAMEN_PATH}/PATATSQL.txt 2>${RAMEN_PATH}/PATAERROR.txt|| exit 
     echo ""
     echo ""
     echo "--- drop"
