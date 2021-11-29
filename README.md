@@ -11,3 +11,11 @@ Commit : https://github.com/postgres/postgres/commit/f76fd05bae047103cb36ef5fb82
 
 ### postgres-ramen
 Our modified version of postgreSQL. Why ramen? Cause why not, every one loves ramen.
+
+
+### Debug printing
+Instead of printing with printf(...) etc., simply put this line in your code
+```C
+FILE* file = fopen("sushiOUT.txt","w+"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
+```
+which while add append everything into an output file in /postgres-ramen/ramendata/sushiOUT.txt
