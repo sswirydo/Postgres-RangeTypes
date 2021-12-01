@@ -83,7 +83,7 @@ function run_pgsql {
     /usr/local/pgsql/bin/dropdb sushi
     echo "--- stop"
     /usr/local/pgsql/bin/pg_ctl stop  -D /usr/local/pgsql/data -m fast || exit
-    sleep 5
+    sleep 2
 EOSU
 }
 

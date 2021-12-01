@@ -119,12 +119,12 @@ rangesel(PG_FUNCTION_ARGS)
 	TypeCacheEntry *typcache = NULL;
 	RangeType  *constrange = NULL;
 
-	/*
+	/* // szymon: on check si c'est une cste, car on est dans un cas de selectivity donc normal, de même en dessous
 	 * If expression is not (variable op something) or (something op
 	 * variable), then punt and return a default estimate.
 	 */
 	if (!get_restriction_variable(root, args, varRelid,
-								  &vardata, &other, &varonleft))
+								  &vardata, &other, &varonleft)) // szymon: ici on rempli vardata (table) et other (cste)
 		PG_RETURN_FLOAT8(default_range_selectivity(operator));
 
 	/*
@@ -146,7 +146,7 @@ rangesel(PG_FUNCTION_ARGS)
 		PG_RETURN_FLOAT8(0.0);
 	}
 
-	/*
+	/* // szymon: on gros comme on travaille avec table + cst, ils inversent justent leur position
 	 * If var is on the right, commute the operator, so that we can assume the
 	 * var is on the left in what follows.
 	 */
