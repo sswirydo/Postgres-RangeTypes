@@ -270,6 +270,10 @@ typedef FormData_pg_statistic *Form_pg_statistic;
  */
 #define STATISTIC_KIND_BOUNDS_HISTOGRAM  7
 
+/* TODO */
+#define STATISTIC_KIND_FREQUENCT_HISTOGRAM  42
+
+
 #endif							/* EXPOSE_TO_CLIENT_CODE */
 
 #endif							/* PG_STATISTIC_H */
