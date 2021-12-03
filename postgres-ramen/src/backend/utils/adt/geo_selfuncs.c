@@ -127,7 +127,14 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 
     fflush(stdout);
 
+
+    //RECUPERER LE FREQUENCY ICI
+    /* ... */
+
+
 	//SZYMON: EN GROS TODO ALGO POUR JOIN SELECTIVITY ICI :3
+    rangeoverlapsjoinsel_inner();
+
 
     pfree(hist_lower1);
     pfree(hist_upper1);
@@ -143,8 +150,9 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 
 
 
-
-
+int rangeoverlapsjoinsel_inner() {
+    /* TODO */
+}
 
 
 //szymon : osef de ce qu'il y a en dessous

@@ -34,7 +34,7 @@
 static int	float8_qsort_cmp(const void *a1, const void *a2);
 static int	range_bound_qsort_cmp(const void *a1, const void *a2, void *arg);
 static void compute_range_stats(VacAttrStats *stats,
-								AnalyzeAttrFetchFunc fetchfunc, int samplerows, double totalrows);
+								AnalyzeAttrFetchFunc fetchfunc, int samplerows); //, double totalrows);
 
 /*
  * range_typanalyze -- typanalyze function for range columns
@@ -95,12 +95,50 @@ range_bound_qsort_cmp(const void *a1, const void *a2, void *arg)
 	return range_cmp_bounds(typcache, b1, b2);
 }
 
+
+static void
+ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, float8* lengths) {
+
+	// idée principale :
+	// 		on crée genre une liste abstraite qui va de la plus petite valeur à la plus grande valeur de ma colonne de ranges
+	// 		on divise cette liste en intervalles réguliers selon par ex la taille de cette liste (ou autre)
+	// 		on calcule le nombre de fois qu'une range pop dans un intervalle de la liste
+
+	
+	for(int i = 0; i < slot_idx; i++){ // Boucle sur les histograms //szymon: pq boucle sur les histo? ds ts les cas on va delete leur trash
+		int nhist = stats->numvalues[i];
+		RangeBound *low = (RangeBound *) palloc(sizeof(RangeBound) * nhist);
+		RangeBound *up = (RangeBound *) palloc(sizeof(RangeBound) * nhist);
+
+		
+	}	
+
+	/*
+	AKA compiling 
+	lower -> parenthèse ouvert
+	upper -> parenthèse fermé
+
+	lower : [0,   1,  2,  3,  4,  5]
+	upper : [20, 21, 22, 23, 24, 25]
+
+	0 1 2 3 4 5 ... 20 21 22 23 24 25
+	( ( ( ( ( ( ... )  )  )  )  )  )
+
+	Counter parenthèse = nombre d'intervale qui se superpose
+	*/
+
+	/* */
+	
+}
+
+
+
 /*
- * compute_range_stats() -- compute statistics for a range column
+ * compute_range_stats() -- compute statistics (if not empty) for (a) range(s) column(s)
  */
 static void
 compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
-					int samplerows, double totalrows)
+					int samplerows)
 {
 	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
 
@@ -124,6 +162,7 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 	uppers = (RangeBound *) palloc(sizeof(RangeBound) * samplerows);
 	lengths = (float8 *) palloc(sizeof(float8) * samplerows);
 
+
 	/* Loop over the sample ranges. */
 	for (range_no = 0; range_no < samplerows; range_no++)
 	{
@@ -137,7 +176,8 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 		vacuum_delay_point();
 
-		value = fetchfunc(stats, range_no, &isnull);
+		// check ce qu'on a est correct ou si y a des trucs
+		value = fetchfunc(stats, range_no, &isnull); // dedans ça met isnull=true soir isnull=false
 		if (isnull)
 		{
 			/* range is null, just count that */
@@ -154,7 +194,9 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 		/* Get range and deserialize it for further analysis. */
 		range = DatumGetRangeTypeP(value);
 		range_deserialize(typcache, range, &lower, &upper, &empty);
+		
 
+		//check si le deserialize est ok.
 		if (!empty)
 		{
 			/* Remember bounds and length for further usage in histograms */
@@ -188,12 +230,14 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			non_empty_cnt++;
 		}
 		else
-			empty_cnt++;
+			empty_cnt++; // rip
 
-		non_null_cnt++;
+		non_null_cnt++; // nombre de range qu'on a deserialise correctement
 	}
 
 	slot_idx = 0;
+
+	// histo crée àpd de la sur base de range désarialisé avant
 
 	/* We can only compute real stats if we found some non-null values. */
 	if (non_null_cnt > 0)
@@ -255,7 +299,6 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 			for (i = 0; i < num_hist; i++)
 			{
-				printf("mayo1\n");
 				// szymon: c'est ici qu'on combine les lower & upper histogrammes en 1
 				bound_hist_values[i] = PointerGetDatum(range_serialize(typcache,
 																	   &lowers[pos],
@@ -272,9 +315,10 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			}
 
 			// alex: c'est qui nous intéresse
-			stats->stakind[slot_idx] = STATISTIC_KIND_BOUNDS_HISTOGRAM;
-			stats->stavalues[slot_idx] = bound_hist_values;
-			stats->numvalues[slot_idx] = num_hist;
+			stats->stakind[slot_idx] = STATISTIC_KIND_BOUNDS_HISTOGRAM; // (id)
+			stats->stavalues[slot_idx] = bound_hist_values; // (from 0 to num_hist-1)
+			stats->numvalues[slot_idx] = num_hist; // nb of hists)
+
 			slot_idx++; // szymon: en gros slot_idx=0 -> bound_hist et slot_inx=1 -> lengths_hist
 		}
 
@@ -350,7 +394,9 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 		stats->numnumbers[slot_idx] = 1;
 
 		stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
-		slot_idx++;
+
+		ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, lengths); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
+		++slot_idx;
 
 		MemoryContextSwitchTo(old_cxt);
 	}

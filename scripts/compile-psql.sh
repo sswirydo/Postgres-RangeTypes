@@ -1,7 +1,14 @@
 #!/bin/bash
 
 :'  Expected format:
-    sudo ./compile-pgsql full_path_sql_script ramen_sql_root_path [official_sql_root_path] '
+    sudo ./compile-pgsql full_path_sql_script ramen_sql_root_path [official_sql_root_path] 
+    
+    alex: sudo ./compile-psql.sh /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/psql-script.sql /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/postgres-ramen 
+    aure: 
+    nico: 
+    szymon: sudo ./scripts/compile-psql.sh /media/sf_Postgres-RangeTypes/scripts/psql-script.sql /media/sf_Postgres-RangeTypes/postgres-ramen/
+
+'
 
 
 
