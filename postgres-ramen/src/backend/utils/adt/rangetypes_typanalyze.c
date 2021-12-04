@@ -96,22 +96,84 @@ range_bound_qsort_cmp(const void *a1, const void *a2, void *arg)
 }
 
 
-static void
-ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, float8* lengths) {
+static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
+{
+	// A && B <=> NOT (A << B OR A >> B)
+	return ! (challenge_up < low_bound || challenge_low > up_bound);
+}
 
+
+static void
+ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows) {
 	// idée principale :
 	// 		on crée genre une liste abstraite qui va de la plus petite valeur à la plus grande valeur de ma colonne de ranges
 	// 		on divise cette liste en intervalles réguliers selon par ex la taille de cette liste (ou autre)
 	// 		on calcule le nombre de fois qu'une range pop dans un intervalle de la liste
 
-	
-	for(int i = 0; i < slot_idx; i++){ // Boucle sur les histograms //szymon: pq boucle sur les histo? ds ts les cas on va delete leur trash
-		int nhist = stats->numvalues[i];
-		RangeBound *low = (RangeBound *) palloc(sizeof(RangeBound) * nhist);
-		RangeBound *up = (RangeBound *) palloc(sizeof(RangeBound) * nhist);
 
+	//for aurelien: x++ and ++X in forloop is the same. :)
+	//for (int x = 0; x < 5; x++) {printf("x: %d\n", x);}
+	//for (int y = 0; y < 5; ++y) {printf("y: %d\n", y);}
 		
-	}	
+	int i;
+	int j;
+	int min_value = NULL;
+	int max_value = NULL;
+
+	int a;
+	int b;
+
+	int length;
+	int interval_length;
+	int nb_of_intervals;
+
+	int* frequencies_vals;
+
+	for (i = 0; i < rows; ++i) {
+		 a = (lowers+i)->val;
+		 b = (*(uppers+i)).val;
+
+		 if (min_value == NULL || a < min_value)
+			min_value = a;
+
+		 if (max_value == NULL || b > max_value)
+			max_value = b;
+	}
+
+	length = b - a;
+	nb_of_intervals = 4; // fixme temp
+	interval_length = length / nb_of_intervals; // ici on divise l'intervalle // à voir comment on divise // juste attention ne pas direct div par row sinon connerie
+	// vérifieer des trucs comme que la longueur d'intervale soit naturelle
+	//  + pas trop petite car trop de stockage et trop de temps
+
+	frequencies_vals = (int*) palloc(sizeof(int) * nb_of_intervals);
+	memset(frequencies_vals, 0, sizeof(sizeof(int) * nb_of_intervals));
+
+
+	// AURE Pense à opti (voir feuille papier, aka compiling)
+	for (i = 0; i < nb_of_intervals; ++i){
+		for (j = 0; j < rows; ++j){
+			if (IsInRange(i*interval_length+1, ((i+1)*interval_length), (lowers+j)->val, (uppers+j)->val)) // range size 0 possible ? genre range(3,3) //btw [Ø,Ø] is empty
+				++(frequencies_vals[i]); 
+		}
+	}
+
+	printf("Intervals:\n");
+	for (i = 0; i < nb_of_intervals; ++i){
+		printf("[%d - %d]", i*interval_length, ((i+1)*interval_length)-1);
+	}
+
+
+	printf("frequencies = [");
+    for (i = 0; i < nb_of_intervals; i++){
+        printf("%d", (frequencies_vals[i]));
+        if (i < nb_of_intervals - 1)
+        	printf(", ");
+    } 
+    printf("]\n"); // frequencies = [666293399, 22076, 14, 17]
+
+
+	// 3 3 2 0 1 //
 
 	/*
 	AKA compiling 
@@ -121,13 +183,24 @@ ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers,
 	lower : [0,   1,  2,  3,  4,  5]
 	upper : [20, 21, 22, 23, 24, 25]
 
+
+	[ 0 1 2 3 4 5 6 7 8 9 ]
+
+
+	[0 ; 2] --> MAX LIMITE à 2 //100 mort
+	[Ø ; 1000000] -> trunc([0;10000]) ->[0;2] MAx limite à 2
+ 
+
+	[-2000 ; 2000] && [Ø ; 1000000]
+
+	[]
+
 	0 1 2 3 4 5 ... 20 21 22 23 24 25
 	( ( ( ( ( ( ... )  )  )  )  )  )
 
 	Counter parenthèse = nombre d'intervale qui se superpose
 	*/
 
-	/* */
 	
 }
 
@@ -297,7 +370,7 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			deltafrac = (non_empty_cnt - 1) % (num_hist - 1);
 			pos = posfrac = 0;
 
-			for (i = 0; i < num_hist; i++)
+			for (i = 0; i < num_hist; i++) // num_hist: number of row
 			{
 				// szymon: c'est ici qu'on combine les lower & upper histogrammes en 1
 				bound_hist_values[i] = PointerGetDatum(range_serialize(typcache,
@@ -395,7 +468,7 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 		stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
 
-		ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, lengths); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
+		ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, num_hist); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
 		++slot_idx;
 
 		MemoryContextSwitchTo(old_cxt);
