@@ -66,16 +66,23 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     AttStatsSlot sslot2;
     int         nhist1;
     int         nhist2;
-    RangeBound *hist_lower1;
-    RangeBound *hist_upper1;
-    RangeBound *hist_lower2;
-    RangeBound *hist_upper2;
+    RangeBound* hist_lower1;
+    RangeBound* hist_upper1;
+    RangeBound* hist_lower2;
+    RangeBound* hist_upper2;
     int         i;
     Form_pg_statistic stats1 = NULL;
     Form_pg_statistic stats2 = NULL;
-    TypeCacheEntry *typcache = NULL;
-    bool        join_is_reversed; // Pas ENCORE utilisé, ici, mais potentiellement important. 
+    TypeCacheEntry* typcache = NULL;
+    bool        join_is_reversed; // TODO Pas ENCORE utilisé, ici, mais potentiellement important. 
     bool        empty;
+
+    AttStatsSlot freq_sslot1;
+    AttStatsSlot freq_sslot2;
+    int         freq_nb_intervals1;
+    int         freq_nb_intervals2;
+    int*        freq_values1;
+    int*        freq_values2;
 
 
     get_join_variables(root, args, sjinfo,
@@ -181,12 +188,74 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 
 
     //RECUPERER LE FREQUENCY ICI
-    /* ... */
+    //stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
+	//stats->stavalues[slot_idx] = frequencies_vals;
+	//stats->numvalues[slot_idx] = nb_of_intervals;
+
+    // ----- FREQUENCY HISTOGRAM ----- //
+
+    memset(&freq_sslot1, 0, sizeof(freq_sslot1));
+    memset(&freq_sslot2, 0, sizeof(freq_sslot2));
+
+    if (HeapTupleIsValid(vardata1.statsTuple))
+    {
+        // stats1 = (Form_pg_statistic) GETSTRUCT(vardata1.statsTuple);
+        /* Try to get fraction of empty ranges */
+        if (!get_attstatsslot(&freq_sslot1, vardata1.statsTuple,
+                             STATISTIC_KIND_FREQUENCY_HISTOGRAM,
+                             InvalidOid, ATTSTATSSLOT_VALUES))
+        {
+            ReleaseVariableStats(vardata1);
+            ReleaseVariableStats(vardata2);
+            PG_RETURN_FLOAT8((float8) selec);
+        }
+    }
+    if (HeapTupleIsValid(vardata2.statsTuple))
+    {
+        // stats2 = (Form_pg_statistic) GETSTRUCT(vardata2.statsTuple);
+        /* Try to get fraction of empty ranges */
+        if (!get_attstatsslot(&freq_sslot2, vardata2.statsTuple,
+                             STATISTIC_KIND_FREQUENCY_HISTOGRAM,
+                             InvalidOid, ATTSTATSSLOT_VALUES))
+        {
+            ReleaseVariableStats(vardata1);
+            ReleaseVariableStats(vardata2);
+            PG_RETURN_FLOAT8((float8) selec);
+        }
+    }
 
 
-	//SZYMON: EN GROS TODO ALGO POUR JOIN SELECTIVITY ICI :3
+    freq_nb_intervals1 = freq_sslot1.nvalues;
+    freq_nb_intervals2 = freq_sslot2.nvalues;
+
+    freq_values1 = (int *) palloc(sizeof(int) * freq_nb_intervals1);
+    freq_values2 = (int *) palloc(sizeof(int) * freq_nb_intervals2);
+
+    // TODO DESERIALIZE FREQUENCIES OR SOMETHING.
+    for (i = 0; i < freq_nb_intervals1; ++i){}
+    for (i = 0; i < freq_nb_intervals2; ++i){}
+
+    // Debug print:
+    printf("Intervals:\n");
+	printf("frequencies = [");
+    for (i = 0; i < freq_nb_intervals2; i++){
+        printf("%d", (frequencies_vals[i]));
+        if (i < nb_of_intervals - 1)
+        	printf(", ");
+    } 
+    printf("]\n");
+
+
+    // ----- FREQUENCY HISTOGRAM ----- //
+
+
+
+    
+	//SZYMON: TODO ALGO POUR JOIN SELECTIVITY ICI :3
     rangeoverlapsjoinsel_inner();
 
+
+    // -- FREE -- //
     pfree(hist_lower1);
     pfree(hist_upper1);
     pfree(hist_lower2);
@@ -197,6 +266,12 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 
     ReleaseVariableStats(vardata1);
     ReleaseVariableStats(vardata2);
+
+    // -- FREQUENCY FREE -- //
+    pfree(freq_values1);
+    pfree(freq_values2);
+    free_attstatsslot(&freq_sslot1);
+    free_attstatsslot(&freq_sslot2);
 
     // selec=0.5;
     CLAMP_PROBABILITY(selec);
@@ -267,3 +342,73 @@ contjoinsel(PG_FUNCTION_ARGS)
 {
 	PG_RETURN_FLOAT8(0.001);
 }
+
+
+// Szymon: copy-pasted here, may be useful to how stats are defined.
+// (from src/include/commands/vacuum.h)
+typedef struct SushiStats//VacAttrStats
+{
+	/*
+	 * These fields are set up by the main ANALYZE code before invoking the
+	 * type-specific typanalyze function.
+	 *
+	 * Note: do not assume that the data being analyzed has the same datatype
+	 * shown in attr, ie do not trust attr->atttypid, attlen, etc.  This is
+	 * because some index opclasses store a different type than the underlying
+	 * column/expression.  Instead use attrtypid, attrtypmod, and attrtype for
+	 * information about the datatype being fed to the typanalyze function.
+	 * Likewise, use attrcollid not attr->attcollation.
+	 */
+	Form_pg_attribute attr;		/* copy of pg_attribute row for column */
+	Oid			attrtypid;		/* type of data being analyzed */
+	int32		attrtypmod;		/* typmod of data being analyzed */
+	Form_pg_type attrtype;		/* copy of pg_type row for attrtypid */
+	Oid			attrcollid;		/* collation of data being analyzed */
+	MemoryContext anl_context;	/* where to save long-lived data */
+
+	/*
+	 * These fields must be filled in by the typanalyze routine, unless it
+	 * returns false.
+	 */
+	AnalyzeAttrComputeStatsFunc compute_stats;	/* function pointer */
+	int			minrows;		/* Minimum # of rows wanted for stats */
+	void	   *extra_data;		/* for extra type-specific data */
+
+	/*
+	 * These fields are to be filled in by the compute_stats routine. (They
+	 * are initialized to zero when the struct is created.)
+	 */
+	bool		stats_valid;
+	float4		stanullfrac;	/* fraction of entries that are NULL */
+	int32		stawidth;		/* average width of column values */
+	float4		stadistinct;	/* # distinct values */
+	int16		stakind[STATISTIC_NUM_SLOTS];
+	Oid			staop[STATISTIC_NUM_SLOTS];
+	Oid			stacoll[STATISTIC_NUM_SLOTS];
+	int			numnumbers[STATISTIC_NUM_SLOTS];
+	float4	   *stanumbers[STATISTIC_NUM_SLOTS];
+	int			numvalues[STATISTIC_NUM_SLOTS];
+	Datum	   *stavalues[STATISTIC_NUM_SLOTS];
+
+	/*
+	 * These fields describe the stavalues[n] element types. They will be
+	 * initialized to match attrtypid, but a custom typanalyze function might
+	 * want to store an array of something other than the analyzed column's
+	 * elements. It should then overwrite these fields.
+	 */
+	Oid			statypid[STATISTIC_NUM_SLOTS];
+	int16		statyplen[STATISTIC_NUM_SLOTS];
+	bool		statypbyval[STATISTIC_NUM_SLOTS];
+	char		statypalign[STATISTIC_NUM_SLOTS];
+
+	/*
+	 * These fields are private to the main ANALYZE code and should not be
+	 * looked at by type-specific functions.
+	 */
+	int			tupattnum;		/* attribute number within tuples */
+	HeapTuple  *rows;			/* access info for std fetch function */
+	TupleDesc	tupDesc;
+	Datum	   *exprvals;		/* access info for index fetch function */
+	bool	   *exprnulls;
+	int			rowstride;
+} SushiStats;

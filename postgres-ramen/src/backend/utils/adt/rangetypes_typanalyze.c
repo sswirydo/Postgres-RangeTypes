@@ -104,7 +104,7 @@ static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up
 
 
 static void
-ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows) {
+ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows) {
 	// idée principale :
 	// 		on crée genre une liste abstraite qui va de la plus petite valeur à la plus grande valeur de ma colonne de ranges
 	// 		on divise cette liste en intervalles réguliers selon par ex la taille de cette liste (ou autre)
@@ -140,11 +140,14 @@ ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers,
 			max_value = b;
 	}
 
+	/// --- TODO TODO TODO --- //
 	length = b - a;
-	nb_of_intervals = 4; // fixme temp
+	nb_of_intervals = 4; // FIXME temp
 	interval_length = length / nb_of_intervals; // ici on divise l'intervalle // à voir comment on divise // juste attention ne pas direct div par row sinon connerie
-	// vérifieer des trucs comme que la longueur d'intervale soit naturelle
+	// vérifier des trucs comme que la longueur d'intervale soit naturelle
 	//  + pas trop petite car trop de stockage et trop de temps
+	//  + ni trop grande sinon estimation sera bien trop grande
+	/// --- TODO TODO TODO --- //
 
 	frequencies_vals = (int*) palloc(sizeof(int) * nb_of_intervals);
 	memset(frequencies_vals, 0, sizeof(sizeof(int) * nb_of_intervals));
@@ -158,20 +161,52 @@ ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers,
 		}
 	}
 
+
+	// Debug print.
+	/*
 	printf("Intervals:\n");
 	for (i = 0; i < nb_of_intervals; ++i){
 		printf("[%d - %d]", i*interval_length, ((i+1)*interval_length)-1);
 	}
-
-
 	printf("frequencies = [");
     for (i = 0; i < nb_of_intervals; i++){
         printf("%d", (frequencies_vals[i]));
         if (i < nb_of_intervals - 1)
         	printf(", ");
     } 
-    printf("]\n"); // frequencies = [666293399, 22076, 14, 17]
+    printf("]\n");
+	*/
 
+	
+	// --- (THIS IS FOR THE LENGTH HISTOGRAM) --- //
+	stats->staop[slot_idx] = Float8LessOperator;
+	stats->stacoll[slot_idx] = InvalidOid;
+	stats->stavalues[slot_idx] = length_hist_values;
+	stats->numvalues[slot_idx] = num_hist;
+	stats->statypid[slot_idx] = FLOAT8OID;
+	stats->statyplen[slot_idx] = sizeof(float8);
+	stats->statypbyval[slot_idx] = FLOAT8PASSBYVAL;
+	stats->statypalign[slot_idx] = 'd';
+	//Store the fraction of empty ranges
+	emptyfrac = (float4 *) palloc(sizeof(float4));
+	*emptyfrac = ((double) empty_cnt) / ((double) non_null_cnt);
+	stats->stanumbers[slot_idx] = emptyfrac;
+	stats->numnumbers[slot_idx] = 1;
+	stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
+
+	// --- THIS IS FOR OUR FREQUENCY HISTOGRAM --- //	// TODO TODO TODO TODO TODO
+	stats->staop[slot_idx] = ...;
+	stats->stacoll[slot_idx] = ...;
+	stats->stavalues[slot_idx] = frequencies_vals
+	stats->numvalues[slot_idx] = nb_of_intervals
+	stats->statypid[slot_idx] = ...;
+	stats->statyplen[slot_idx] = sizeof(...);
+	stats->statypbyval[slot_idx] = ...;
+	stats->statypalign[slot_idx] = ...;
+	//Store the fraction of empty ranges
+	stats->stanumbers[slot_idx] = ...;
+	stats->numnumbers[slot_idx] = ...;
+	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
 
 	// 3 3 2 0 1 //
 
@@ -183,14 +218,11 @@ ComputeFrequencyHistogram(VacAttrStats *stats, int slot_idx, RangeBound* lowers,
 	lower : [0,   1,  2,  3,  4,  5]
 	upper : [20, 21, 22, 23, 24, 25]
 
-
 	[ 0 1 2 3 4 5 6 7 8 9 ]
-
 
 	[0 ; 2] --> MAX LIMITE à 2 //100 mort
 	[Ø ; 1000000] -> trunc([0;10000]) ->[0;2] MAx limite à 2
  
-
 	[-2000 ; 2000] && [Ø ; 1000000]
 
 	[]
