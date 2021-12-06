@@ -242,6 +242,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	//stats->numnumbers[slot_idx] = ...;
 	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
 	
+	
 }
 
 /*
