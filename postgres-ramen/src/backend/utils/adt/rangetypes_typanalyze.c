@@ -152,97 +152,121 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	/// --- TODO TODO TODO --- //
 
 	frequencies_vals = (int*) palloc(sizeof(int) * nb_of_intervals);
-	memset(frequencies_vals, 0, sizeof(int) * nb_of_intervals);
-
 	frequencies_intervals = (int*) palloc(sizeof(int) * nb_of_intervals);
+	memset(frequencies_vals, 0, sizeof(int) * nb_of_intervals);
 	memset(frequencies_intervals, 0, sizeof(int) * nb_of_intervals);
 
 	//// TODO Equidepth
 	
-	// Version Aure AKA Compiling
-	// /*
+	// Version Aure AKA Compiling 
+
+	int tot_count = 0; // used after for normalization
 	int l = 0;
 	int u = 0;
 	int count = 0;
-	int sup = 0;
+	int sup = a;
+	/*
+	// ERREUR A DEBUG (ou delete :p)
+
 	for (i = 0; i < nb_of_intervals; ++i){
 		sup += interval_length;
 		frequencies_intervals[i] = sup;
 		while((lowers+l)->val <= sup){
 			count++;
+			tot_count++;
 			l++;
 		}
 		frequencies_vals[i] = count;
-		while((uppers+u)->val <= sup){
+		while((uppers+u)->val < sup){
 			count--;
 			u++;
 		}
 	}
-	// */
+	*/
 
 	// Version Szymon AKA First
-	/*
+	
 	for (i = 0; i < nb_of_intervals; ++i){
 		frequencies_intervals[i] = (i+1)*interval_length;
 		for (j = 0; j < rows; ++j){
 			if (IsInRange(i*interval_length+1, ((i+1)*interval_length), (lowers+j)->val, (uppers+j)->val)) // range size 0 possible ? genre range(3,3) //btw [Ø,Ø] is empty
 				++(frequencies_vals[i]); 
+				tot_count++;
 		}
 	}
-	*/
 	
+	
+	printf("TOT COUNT : %d\n", tot_count);
+	float ratio;
+	ratio = ((float) rows) / ((float) tot_count); // divided by "tot_count" (= pourcentage) -> multiply by "rows" (weighted)
+	float8* normalized_frequencies_vals;
+	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
+	for (i = 0; i < nb_of_intervals; ++i){
+		
+		printf("---BEFORE: %d\n", frequencies_vals[i]);
+		normalized_frequencies_vals[i] = (float8) ((float) frequencies_vals[i]) * ratio;
+		printf("---AFTER: %f\n", normalized_frequencies_vals[i]);
+
+	}
+
+	Datum* hist_frequencies_vals = (Datum *) palloc(sizeof(Datum) * nb_of_intervals);
+	for (i = 0; i < nb_of_intervals; ++i) {
+		hist_frequencies_vals[i] = Float8GetDatum(normalized_frequencies_vals[i]);
+	}
+
+
 	// Debug print.
+	/*
 	printf("Intervals:\n");
 	for (i = 0; i < nb_of_intervals; ++i){
 		printf("[%d - %d]", i*interval_length, ((i+1)*interval_length)-1);
-		fflush(stdout);
 	}
-	
 	printf("\nfrequencies = [");
     for (i = 0; i < nb_of_intervals; i++){
-        printf("%d", (frequencies_vals[i]));
-		fflush(stdout);
+        printf("%f", (frequencies_vals[i]));
         if (i < nb_of_intervals - 1)
         	printf(", ");
-			fflush(stdout);
     } 
     printf("]\n");
 	fflush(stdout);
+	*/
 
-	/*
-	// --- (THIS IS FOR THE LENGTH HISTOGRAM) --- //
 	stats->staop[slot_idx] = Float8LessOperator;
 	stats->stacoll[slot_idx] = InvalidOid;
-	stats->stavalues[slot_idx] = length_hist_values;
-	stats->numvalues[slot_idx] = num_hist;
+	stats->stavalues[slot_idx] = hist_frequencies_vals;
+	stats->numvalues[slot_idx] = nb_of_intervals;
 	stats->statypid[slot_idx] = FLOAT8OID;
 	stats->statyplen[slot_idx] = sizeof(float8);
 	stats->statypbyval[slot_idx] = FLOAT8PASSBYVAL;
 	stats->statypalign[slot_idx] = 'd';
 	//Store the fraction of empty ranges
-	emptyfrac = (float4 *) palloc(sizeof(float4));
-	*emptyfrac = ((double) empty_cnt) / ((double) non_null_cnt);
-	stats->stanumbers[slot_idx] = emptyfrac;
-	stats->numnumbers[slot_idx] = 1;
-	stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
-	*/
-	
-	// --- THIS IS FOR OUR FREQUENCY HISTOGRAM --- //	// TODO TODO TODO TODO TODO
-	stats->staop[slot_idx] = Int8LessOperator;
-	stats->stacoll[slot_idx] = InvalidOid; // alex: used by vacuum
-	stats->stavalues[slot_idx] = frequencies_vals;
+	//emptyfrac = (float4 *) palloc(sizeof(float4));
+	//*emptyfrac = ((double) empty_cnt) / ((double) non_null_cnt);
+	//stats->stanumbers[slot_idx] = emptyfrac;
+	//stats->numnumbers[slot_idx] = 1;
+	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
+
+	// --- (THIS IS FOR THE LENGTH HISTOGRAM) --- //
+	/*
+	stats->staop[slot_idx] = Float8LessOperator;
+	stats->stacoll[slot_idx] = InvalidOid;
+	stats->stavalues[slot_idx] = frequencies_intervals;
 	stats->numvalues[slot_idx] = nb_of_intervals;
-	stats->statypid[slot_idx] = INT8OID;
-	stats->statyplen[slot_idx] = sizeof(int8);
-	stats->statypbyval[slot_idx] = true;
+	stats->statypid[slot_idx] = FLOAT8OID;
+	stats->statyplen[slot_idx] = sizeof(float8);
+	stats->statypbyval[slot_idx] = FLOAT8PASSBYVAL;
 	stats->statypalign[slot_idx] = 'd';
 	//Store the fraction of empty ranges
-	//alex: on va supposer que c'est pas vide faut pas deconner
-	//stats->stanumbers[slot_idx] = ...;
-	//stats->numnumbers[slot_idx] = ...;
-	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
+	//emptyfrac = (float4 *) palloc(sizeof(float4));
+	//*emptyfrac = ((double) empty_cnt) / ((double) non_null_cnt);
+	//stats->stanumbers[slot_idx] = emptyfrac;
+	//stats->numnumbers[slot_idx] = 1;
+	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM_LENGTH;
+	*/
 	
-	
+
+	pfree(frequencies_vals);
+	pfree(normalized_frequencies_vals);
 }
 
 /*

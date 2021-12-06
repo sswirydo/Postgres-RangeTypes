@@ -39,7 +39,7 @@
 #include "utils/typcache.h"
 
 
-
+double rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2);
 
 
 /*
@@ -57,7 +57,7 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     SpecialJoinInfo *sjinfo = (SpecialJoinInfo *) PG_GETARG_POINTER(4);
     Oid         collation = PG_GET_COLLATION();
 
-    double      selec = 0.005; // nb_result / nb_result_max
+    double      selec = 0.005;
 
     VariableStatData vardata1;
     VariableStatData vardata2;
@@ -81,8 +81,8 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     AttStatsSlot freq_sslot2;
     int         freq_nb_intervals1;
     int         freq_nb_intervals2;
-    int*        freq_values1;
-    int*        freq_values2;
+    float*        freq_values1;
+    float*        freq_values2;
 
 
     get_join_variables(root, args, sjinfo,
@@ -187,11 +187,6 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     fflush(stdout);
 
 
-    //RECUPERER LE FREQUENCY ICI
-    //stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
-	//stats->stavalues[slot_idx] = frequencies_vals;
-	//stats->numvalues[slot_idx] = nb_of_intervals;
-
     // ----- FREQUENCY HISTOGRAM ----- //
     memset(&freq_sslot1, 0, sizeof(freq_sslot1));
     memset(&freq_sslot2, 0, sizeof(freq_sslot2));
@@ -224,16 +219,16 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     freq_nb_intervals1 = freq_sslot1.nvalues;
     freq_nb_intervals2 = freq_sslot2.nvalues;
 
-    freq_values1 = (int *) palloc(sizeof(int) * freq_nb_intervals1);
-    freq_values2 = (int *) palloc(sizeof(int) * freq_nb_intervals2);
+    freq_values1 = (float *) palloc(sizeof(float) * freq_nb_intervals1);
+    freq_values2 = (float *) palloc(sizeof(float) * freq_nb_intervals2);
 
    printf("\n*****************\n");
 
     for (i = 0; i < freq_nb_intervals1; ++i){
-        freq_values1[i] = DatumGetInt32(freq_sslot1.values[i]);
+        freq_values1[i] = DatumGetFloat8(freq_sslot1.values[i]);
     }
     for (i = 0; i < freq_nb_intervals2; ++i){
-        freq_values2[i] = DatumGetInt32(freq_sslot2.values[i]);
+        freq_values2[i] = DatumGetFloat8(freq_sslot2.values[i]);
     }
 
 
@@ -242,7 +237,7 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     printf("Intervals 1:\n");
 	printf("frequencies = [");
     for (i = 0; i < freq_nb_intervals1; i++){
-        printf("%d", (freq_values1[i]));
+        printf("%f", (freq_values1[i]));
         if (i < freq_nb_intervals1 - 1)
         	printf(", ");
     } 
@@ -252,7 +247,7 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     printf("Intervals 2:\n");
 	printf("frequencies = [");
     for (i = 0; i < freq_nb_intervals2; i++){
-        printf("%d", (freq_values2[i]));
+        printf("%f", (freq_values2[i]));
         if (i < freq_nb_intervals2 - 1)
         	printf(", ");
     } 
@@ -263,10 +258,9 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     // ----- FREQUENCY HISTOGRAM ----- //
 
 
-
-    
 	//SZYMON: TODO ALGO POUR JOIN SELECTIVITY ICI :3
-    rangeoverlapsjoinsel_inner();
+    selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2);
+
 
 
     // -- FREE -- //
@@ -286,16 +280,17 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     pfree(freq_values2);
     free_attstatsslot(&freq_sslot1);
     free_attstatsslot(&freq_sslot2);
-
-    // selec=0.5;
+    
     CLAMP_PROBABILITY(selec);
-    PG_RETURN_FLOAT8((float8) selec); //compris entre 0 et 1
+    PG_RETURN_FLOAT8((float8) selec); // VALUE BETWEEN 0 AND 1.
 }
 
 
-
-int rangeoverlapsjoinsel_inner() {
+double rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2) {
+    
     /* TODO */
+    
+    return 0.005; //FIXME TEMP (return selectivity)
 }
 
 

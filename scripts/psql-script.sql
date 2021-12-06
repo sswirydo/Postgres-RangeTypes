@@ -7,7 +7,7 @@ INSERT INTO tablealacon SELECT int4range(0, s+1, '[)') FROM generate_series(0, 4
 -- '(' or ')' = borne non-comprise
 -- '[' or ']' = born comprise
 VACUUM ANALYZE tablealacon;
--- SELECT * FROM tablealacon;
+SELECT * FROM tablealacon;
 
 CREATE TABLE temp1(r int4range);
 CREATE TABLE temp2(r int4range);
