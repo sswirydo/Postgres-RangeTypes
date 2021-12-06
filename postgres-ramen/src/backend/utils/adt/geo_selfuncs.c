@@ -193,14 +193,12 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 	//stats->numvalues[slot_idx] = nb_of_intervals;
 
     // ----- FREQUENCY HISTOGRAM ----- //
-
     memset(&freq_sslot1, 0, sizeof(freq_sslot1));
     memset(&freq_sslot2, 0, sizeof(freq_sslot2));
 
     if (HeapTupleIsValid(vardata1.statsTuple))
     {
         // stats1 = (Form_pg_statistic) GETSTRUCT(vardata1.statsTuple);
-        /* Try to get fraction of empty ranges */
         if (!get_attstatsslot(&freq_sslot1, vardata1.statsTuple,
                              STATISTIC_KIND_FREQUENCY_HISTOGRAM,
                              InvalidOid, ATTSTATSSLOT_VALUES))
@@ -213,7 +211,6 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     if (HeapTupleIsValid(vardata2.statsTuple))
     {
         // stats2 = (Form_pg_statistic) GETSTRUCT(vardata2.statsTuple);
-        /* Try to get fraction of empty ranges */
         if (!get_attstatsslot(&freq_sslot2, vardata2.statsTuple,
                              STATISTIC_KIND_FREQUENCY_HISTOGRAM,
                              InvalidOid, ATTSTATSSLOT_VALUES))
@@ -224,27 +221,44 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
         }
     }
 
-
     freq_nb_intervals1 = freq_sslot1.nvalues;
     freq_nb_intervals2 = freq_sslot2.nvalues;
 
     freq_values1 = (int *) palloc(sizeof(int) * freq_nb_intervals1);
     freq_values2 = (int *) palloc(sizeof(int) * freq_nb_intervals2);
 
-    // TODO DESERIALIZE FREQUENCIES OR SOMETHING.
-    for (i = 0; i < freq_nb_intervals1; ++i){}
-    for (i = 0; i < freq_nb_intervals2; ++i){}
+   printf("\n*****************\n");
+
+    for (i = 0; i < freq_nb_intervals1; ++i){
+        freq_values1[i] = DatumGetInt32(freq_sslot1.values[i]);
+    }
+    for (i = 0; i < freq_nb_intervals2; ++i){
+        freq_values2[i] = DatumGetInt32(freq_sslot2.values[i]);
+    }
+
 
     // Debug print:
-    printf("Intervals:\n");
+    printf("SUUUUUUUUUUUUSHHHI:\n");
+    printf("Intervals 1:\n");
 	printf("frequencies = [");
-    for (i = 0; i < freq_nb_intervals2; i++){
-        printf("%d", (frequencies_vals[i]));
-        if (i < nb_of_intervals - 1)
+    for (i = 0; i < freq_nb_intervals1; i++){
+        printf("%d", (freq_values1[i]));
+        if (i < freq_nb_intervals1 - 1)
         	printf(", ");
     } 
     printf("]\n");
 
+    // Debug print2:
+    printf("Intervals 2:\n");
+	printf("frequencies = [");
+    for (i = 0; i < freq_nb_intervals2; i++){
+        printf("%d", (freq_values2[i]));
+        if (i < freq_nb_intervals2 - 1)
+        	printf(", ");
+    } 
+    printf("]\n");
+    fflush(stdout);
+    
 
     // ----- FREQUENCY HISTOGRAM ----- //
 

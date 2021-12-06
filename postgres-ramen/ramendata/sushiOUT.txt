@@ -439,4 +439,13 @@ File: analyze.c Line: 555 Fct: do_analyze_rel Info: compute_stats(...) call
 File: rangetypes_typanalyze.c Line: 45 Fct: range_typanalyze Info: 1
 File: rangetypes_typanalyze.c Line: 46 Fct: range_typanalyze Info: 2
 File: analyze.c Line: 555 Fct: do_analyze_rel Info: compute_stats(...) call
-File: rangetypes_typanalyze.c Line: 216 Fct: compute_range_stats Info: 
+File: rangetypes_typanalyze.c Line: 268 Fct: compute_range_stats Info: 
+File: rangetypes_typanalyze.c Line: 45 Fct: range_typanalyze Info: 1
+File: rangetypes_typanalyze.c Line: 46 Fct: range_typanalyze Info: 2
+File: analyze.c Line: 555 Fct: do_analyze_rel Info: compute_stats(...) call
+File: rangetypes_typanalyze.c Line: 268 Fct: compute_range_stats Info: 
+File: rangetypes_typanalyze.c Line: 45 Fct: range_typanalyze Info: 1
+File: rangetypes_typanalyze.c Line: 46 Fct: range_typanalyze Info: 2
+File: analyze.c Line: 555 Fct: do_analyze_rel Info: compute_stats(...) call
+File: rangetypes_typanalyze.c Line: 268 Fct: compute_range_stats Info: 
+File: geo_selfuncs.c Line: 51 Fct: rangeoverlapsjoinsel Info: 

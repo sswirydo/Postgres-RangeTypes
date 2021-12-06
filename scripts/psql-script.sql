@@ -3,9 +3,11 @@
 
 
 CREATE TABLE tablealacon(r int4range);
-INSERT INTO tablealacon SELECT int4range(0, s) FROM generate_series(0, 40) AS s; -- frequencies = [40, 30, 20, 10]
+INSERT INTO tablealacon SELECT int4range(0, s+1, '[)') FROM generate_series(0, 40) AS s; -- frequencies = [40, 30, 20, 10]
+-- '(' or ')' = borne non-comprise
+-- '[' or ']' = born comprise
 VACUUM ANALYZE tablealacon;
-SELECT * FROM tablealacon;
+-- SELECT * FROM tablealacon;
 
 CREATE TABLE temp1(r int4range);
 CREATE TABLE temp2(r int4range);
@@ -15,14 +17,14 @@ INSERT INTO temp2 SELECT int4range((-s)*3, s*4) FROM generate_series(0, 50) AS s
 
 
 
--- VACUUM ANALYZE temp1; -- per column
--- VACUUM ANALYZE temp2;
+VACUUM ANALYZE temp1; -- per column
+VACUUM ANALYZE temp2;
 
 
 
 -- EXPLAIN SELECT count(*) FROM temp1 t1, temp2 t2 WHERE t1.r && int4range(60, 100);
 
--- EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM temp1 t1, temp2 t2 WHERE t1.r && t2.r;
+EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM temp1 t1, temp2 t2 WHERE t1.r && t2.r;
 
 
 -- SELECT * FROM pg_stats WHERE tablename = temp1;-- AND attname = r;

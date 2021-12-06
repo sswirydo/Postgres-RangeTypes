@@ -111,7 +111,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	// 		on calcule le nombre de fois qu'une range pop dans un intervalle de la liste
 
 
-	//for aurelien: x++ and ++X in forloop is the same. :)
+	//for aurelien & alex : x++ and ++X in forloop is the same. :)
 	//for (int x = 0; x < 5; x++) {printf("x: %d\n", x);}
 	//for (int y = 0; y < 5; ++y) {printf("y: %d\n", y);}
 		
@@ -128,7 +128,9 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int nb_of_intervals;
 
 	int* frequencies_vals;
-
+	int* frequencies_intervals;
+	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
+	
 	for (i = 0; i < rows; ++i) {
 		 a = (lowers+i)->val;
 		 b = (*(uppers+i)).val;
@@ -142,7 +144,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 
 	/// --- TODO TODO TODO --- //
 	length = b - a;
-	nb_of_intervals = 4; // FIXME temp
+	nb_of_intervals = length/2;//4; // FIXME temp
 	interval_length = length / nb_of_intervals; // ici on divise l'intervalle // à voir comment on divise // juste attention ne pas direct div par row sinon connerie
 	// vérifier des trucs comme que la longueur d'intervale soit naturelle
 	//  + pas trop petite car trop de stockage et trop de temps
@@ -150,34 +152,64 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	/// --- TODO TODO TODO --- //
 
 	frequencies_vals = (int*) palloc(sizeof(int) * nb_of_intervals);
-	memset(frequencies_vals, 0, sizeof(sizeof(int) * nb_of_intervals));
+	memset(frequencies_vals, 0, sizeof(int) * nb_of_intervals);
 
+	frequencies_intervals = (int*) palloc(sizeof(int) * nb_of_intervals);
+	memset(frequencies_intervals, 0, sizeof(int) * nb_of_intervals);
 
-	// AURE Pense à opti (voir feuille papier, aka compiling)
+	//// TODO Equidepth
+	
+	// Version Aure AKA Compiling
+	// /*
+	int l = 0;
+	int u = 0;
+	int count = 0;
+	int sup = 0;
 	for (i = 0; i < nb_of_intervals; ++i){
+		sup += interval_length;
+		frequencies_intervals[i] = sup;
+		while((lowers+l)->val <= sup){
+			count++;
+			l++;
+		}
+		frequencies_vals[i] = count;
+		while((uppers+u)->val <= sup){
+			count--;
+			u++;
+		}
+	}
+	// */
+
+	// Version Szymon AKA First
+	/*
+	for (i = 0; i < nb_of_intervals; ++i){
+		frequencies_intervals[i] = (i+1)*interval_length;
 		for (j = 0; j < rows; ++j){
 			if (IsInRange(i*interval_length+1, ((i+1)*interval_length), (lowers+j)->val, (uppers+j)->val)) // range size 0 possible ? genre range(3,3) //btw [Ø,Ø] is empty
 				++(frequencies_vals[i]); 
 		}
 	}
-
-
+	*/
+	
 	// Debug print.
-	/*
 	printf("Intervals:\n");
 	for (i = 0; i < nb_of_intervals; ++i){
 		printf("[%d - %d]", i*interval_length, ((i+1)*interval_length)-1);
+		fflush(stdout);
 	}
-	printf("frequencies = [");
+	
+	printf("\nfrequencies = [");
     for (i = 0; i < nb_of_intervals; i++){
         printf("%d", (frequencies_vals[i]));
+		fflush(stdout);
         if (i < nb_of_intervals - 1)
         	printf(", ");
+			fflush(stdout);
     } 
     printf("]\n");
-	*/
+	fflush(stdout);
 
-	
+	/*
 	// --- (THIS IS FOR THE LENGTH HISTOGRAM) --- //
 	stats->staop[slot_idx] = Float8LessOperator;
 	stats->stacoll[slot_idx] = InvalidOid;
@@ -193,50 +225,24 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	stats->stanumbers[slot_idx] = emptyfrac;
 	stats->numnumbers[slot_idx] = 1;
 	stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
-
-	// --- THIS IS FOR OUR FREQUENCY HISTOGRAM --- //	// TODO TODO TODO TODO TODO
-	stats->staop[slot_idx] = ...;
-	stats->stacoll[slot_idx] = ...;
-	stats->stavalues[slot_idx] = frequencies_vals
-	stats->numvalues[slot_idx] = nb_of_intervals
-	stats->statypid[slot_idx] = ...;
-	stats->statyplen[slot_idx] = sizeof(...);
-	stats->statypbyval[slot_idx] = ...;
-	stats->statypalign[slot_idx] = ...;
-	//Store the fraction of empty ranges
-	stats->stanumbers[slot_idx] = ...;
-	stats->numnumbers[slot_idx] = ...;
-	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
-
-	// 3 3 2 0 1 //
-
-	/*
-	AKA compiling 
-	lower -> parenthèse ouvert
-	upper -> parenthèse fermé
-
-	lower : [0,   1,  2,  3,  4,  5]
-	upper : [20, 21, 22, 23, 24, 25]
-
-	[ 0 1 2 3 4 5 6 7 8 9 ]
-
-	[0 ; 2] --> MAX LIMITE à 2 //100 mort
-	[Ø ; 1000000] -> trunc([0;10000]) ->[0;2] MAx limite à 2
- 
-	[-2000 ; 2000] && [Ø ; 1000000]
-
-	[]
-
-	0 1 2 3 4 5 ... 20 21 22 23 24 25
-	( ( ( ( ( ( ... )  )  )  )  )  )
-
-	Counter parenthèse = nombre d'intervale qui se superpose
 	*/
-
+	
+	// --- THIS IS FOR OUR FREQUENCY HISTOGRAM --- //	// TODO TODO TODO TODO TODO
+	stats->staop[slot_idx] = Int8LessOperator;
+	stats->stacoll[slot_idx] = InvalidOid; // alex: used by vacuum
+	stats->stavalues[slot_idx] = frequencies_vals;
+	stats->numvalues[slot_idx] = nb_of_intervals;
+	stats->statypid[slot_idx] = INT8OID;
+	stats->statyplen[slot_idx] = sizeof(int8);
+	stats->statypbyval[slot_idx] = true;
+	stats->statypalign[slot_idx] = 'd';
+	//Store the fraction of empty ranges
+	//alex: on va supposer que c'est pas vide faut pas deconner
+	//stats->stanumbers[slot_idx] = ...;
+	//stats->numnumbers[slot_idx] = ...;
+	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
 	
 }
-
-
 
 /*
  * compute_range_stats() -- compute statistics (if not empty) for (a) range(s) column(s)
