@@ -38,8 +38,12 @@
 #include "utils/selfuncs.h"
 #include "utils/typcache.h"
 
-
-double rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2);
+// -- H-417 OUR FUNCTIONS -- //
+Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
+Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
+static int roundUpDivision(int numerator, int divider);
+static void _debug_print_frequencies(float8* frequencies_vals, int size);
+// ------------------------- //
 
 
 /*
@@ -57,252 +61,165 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     SpecialJoinInfo *sjinfo = (SpecialJoinInfo *) PG_GETARG_POINTER(4);
     Oid         collation = PG_GET_COLLATION();
 
-    // en gros le type Selectivity c'est un double mais ça rend plus obvious le fait que ça sert à la selectivité xd
-    Selectivity selec = 0.005; 
-
-    VariableStatData vardata1;
-    VariableStatData vardata2;
+    VariableStatData vardata1, vardata2;
     Oid         opfuncoid;
-    AttStatsSlot sslot1;
-    AttStatsSlot sslot2;
-    int         nhist1;
-    int         nhist2;
-    RangeBound* hist_lower1;
-    RangeBound* hist_upper1;
-    RangeBound* hist_lower2;
-    RangeBound* hist_upper2;
+    AttStatsSlot sslot1, sslot2;
+    int         nhist1, nhist2;
     int         i;
     Form_pg_statistic stats1 = NULL;
     Form_pg_statistic stats2 = NULL;
     TypeCacheEntry* typcache = NULL;
     bool        join_is_reversed; // TODO Pas ENCORE utilisé, ici, mais potentiellement important. 
     bool        empty;
+    AttStatsSlot freq_sslot1, freq_sslot2;
+    int         freq_nb_intervals1, freq_nb_intervals2;
+    float*        freq_values1 = NULL
+    float*        freq_values2 = NULL
+    Selectivity selec = 0.005; // Selectivity is a double. It is named Selectivity just to make its purpose more obvious.
 
-    AttStatsSlot freq_sslot1;
-    AttStatsSlot freq_sslot2;
-    int         freq_nb_intervals1;
-    int         freq_nb_intervals2;
-    float*        freq_values1;
-    float*        freq_values2;
-
-
-    get_join_variables(root, args, sjinfo,
-                       &vardata1, &vardata2, &join_is_reversed);
-
+    // -- Retriving important variables. -- //
+    get_join_variables(root, args, sjinfo, &vardata1, &vardata2, &join_is_reversed);
     typcache = range_get_typcache(fcinfo, vardata1.vartype);
     opfuncoid = get_opcode(operator);
 
+    // -- Allocating memory for AttStatsSlot (stores our statistics) -- //
     memset(&sslot1, 0, sizeof(sslot1));
     memset(&sslot2, 0, sizeof(sslot2));
+    memset(&freq_sslot1, 0, sizeof(freq_sslot1));
+    memset(&freq_sslot2, 0, sizeof(freq_sslot2));
 
-    /* Can't use the histogram with insecure range support functions */
+    // -- STATISTIC CHECK -- //
     if (!statistic_proc_security_check(&vardata1, opfuncoid))
         PG_RETURN_FLOAT8((float8) selec);
     if (!statistic_proc_security_check(&vardata2, opfuncoid))
         PG_RETURN_FLOAT8((float8) selec);
 
-    if (HeapTupleIsValid(vardata1.statsTuple))
+    // -- RETRIVING HISTOGGRAMS -- //
+    if (HeapTupleIsValid(vardata1.statsTuple) && HeapTupleIsValid(vardata2.statsTuple))
     {
-        stats1 = (Form_pg_statistic) GETSTRUCT(vardata1.statsTuple);
-        /* Try to get fraction of empty ranges */
-        if (!get_attstatsslot(&sslot1, vardata1.statsTuple,
-                             STATISTIC_KIND_BOUNDS_HISTOGRAM,
+        if (! ((get_attstatsslot(&sslot1, vardata1.statsTuple,
+                                        STATISTIC_KIND_BOUNDS_HISTOGRAM,
+                                        InvalidOid, ATTSTATSSLOT_VALUES)) 
+            && (get_attstatsslot(&sslot2, vardata2.statsTuple,
+                                        STATISTIC_KIND_BOUNDS_HISTOGRAM,
+                                        InvalidOid, ATTSTATSSLOT_VALUES))
+            && (get_attstatsslot(&freq_sslot1, vardata1.statsTuple,
+                             STATISTIC_KIND_FREQUENCY_HISTOGRAM,
                              InvalidOid, ATTSTATSSLOT_VALUES))
+            && (get_attstatsslot(&freq_sslot2, vardata2.statsTuple,
+                             STATISTIC_KIND_FREQUENCY_HISTOGRAM,
+                             InvalidOid, ATTSTATSSLOT_VALUES))))
         {
-            ReleaseVariableStats(vardata1);
-            ReleaseVariableStats(vardata2);
+            ReleaseVariableStats(vardata1); ReleaseVariableStats(vardata2);
+            pfree(sslot1); pfree(sslot2); pfree(freq_sslot1); pfree(freq_sslot2);
             PG_RETURN_FLOAT8((float8) selec);
         }
     }
+    
+    //////////////////////
+	// BOUNDS HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
+	//////////////////////
+    
+    RangeBound r_min1, r_min2, r_max1, r_max2;
+    int min1, min2, max1, max2;
+    RangeBound buffer;
 
-    if (HeapTupleIsValid(vardata2.statsTuple))
-    {
-        stats2 = (Form_pg_statistic) GETSTRUCT(vardata2.statsTuple);
-        /* Try to get fraction of empty ranges */
-        if (!get_attstatsslot(&sslot2, vardata2.statsTuple,
-                             STATISTIC_KIND_BOUNDS_HISTOGRAM,
-                             InvalidOid, ATTSTATSSLOT_VALUES))
-        {
-            ReleaseVariableStats(vardata1);
-            ReleaseVariableStats(vardata2);
-            PG_RETURN_FLOAT8((float8) selec);
-        }
-    }
-
+    // -- Retriving the sizes of each histogram. i.e. the number of rows. -- //
     nhist1 = sslot1.nvalues;
     nhist2 = sslot2.nvalues;
+    
+    // -- Deserializing ranges in order to obtain RangeBounds. -- // --> RangeBounds are ordered from lowest to highest.
+    range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[0]), &r_min1, &buffer, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
+    range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[nhist1-1]), &buffer, &r_max1, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
+    range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[0]), &r_min2, &buffer, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
+    range_deserialize(typcache, DatumGetRangeTypeP(sslot2.values[nhist2-1]), &buffer, &r_max2, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
 
-    hist_lower1 = (RangeBound *) palloc(sizeof(RangeBound) * nhist1);
-    hist_upper1 = (RangeBound *) palloc(sizeof(RangeBound) * nhist1);
+    // -- Getting the integer values from range bounds -- //
+    min1 = r_min1.val;
+    min2 = r_min2.val;
+    max1 = r_max1.val;
+    max1 = r_max2.val;
 
-    hist_lower2 = (RangeBound *) palloc(sizeof(RangeBound) * nhist2);
-    hist_upper2 = (RangeBound *) palloc(sizeof(RangeBound) * nhist2);
+    /////////////////////////
+	// FREQUENCY HISTOGRAM //
+	/////////////////////////
 
-    for (i = 0; i < nhist1; i++){
-        range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[i]),
-                          &hist_lower1[i], &hist_upper1[i], &empty);
-        /* The histogram should not contain any empty ranges */
-        if (empty)
-            elog(ERROR, "bounds histogram contains an empty range");
-    }
-
-    for (i = 0; i < nhist2; i++){
-        range_deserialize(typcache, DatumGetRangeTypeP(sslot2.values[i]),
-                          &hist_lower2[i], &hist_upper2[i], &empty);
-        /* The histogram should not contain any empty ranges */
-        if (empty)
-            elog(ERROR, "bounds histogram contains an empty range");
-    }
-
-    printf("is_reversed %d\n", join_is_reversed);
-    printf("hist_lower1 = [");
-    for (i = 0; i < nhist1; i++){
-        printf("%d", DatumGetInt16((hist_lower1+i)->val));
-        if (i < nhist1 - 1)
-            printf(", ");
-    }
-    printf("]\n");
-    printf("hist_upper1 = [");
-    for (i = 0; i < nhist1; i++){
-        printf("%d", DatumGetInt16((hist_upper1+i)->val));
-        if (i < nhist1 - 1)
-            printf(", ");
-    }
-    printf("]\n");
-    fflush(stdout);
-
-    printf("hist_lower2 = [");
-    for (i = 0; i < nhist2; i++){
-        printf("%d", DatumGetInt16((hist_lower2+i)->val));
-        if (i < nhist2 - 1)
-            printf(", ");
-    }
-    printf("]\n");
-    printf("hist_upper2 = [");
-    for (i = 0; i < nhist2; i++){
-        printf("%d", DatumGetInt16((hist_upper2+i)->val));
-        if (i < nhist2 - 1)
-            printf(", ");
-    }
-    printf("]\n");
-    fflush(stdout);
-
-
-    // ----- FREQUENCY HISTOGRAM ----- //
-    memset(&freq_sslot1, 0, sizeof(freq_sslot1));
-    memset(&freq_sslot2, 0, sizeof(freq_sslot2));
-
-    if (HeapTupleIsValid(vardata1.statsTuple))
-    {
-        // stats1 = (Form_pg_statistic) GETSTRUCT(vardata1.statsTuple);
-        if (!get_attstatsslot(&freq_sslot1, vardata1.statsTuple,
-                             STATISTIC_KIND_FREQUENCY_HISTOGRAM,
-                             InvalidOid, ATTSTATSSLOT_VALUES))
-        {
-            ReleaseVariableStats(vardata1);
-            ReleaseVariableStats(vardata2);
-            PG_RETURN_FLOAT8((float8) selec);
-        }
-    }
-    if (HeapTupleIsValid(vardata2.statsTuple))
-    {
-        // stats2 = (Form_pg_statistic) GETSTRUCT(vardata2.statsTuple);
-        if (!get_attstatsslot(&freq_sslot2, vardata2.statsTuple,
-                             STATISTIC_KIND_FREQUENCY_HISTOGRAM,
-                             InvalidOid, ATTSTATSSLOT_VALUES))
-        {
-            ReleaseVariableStats(vardata1);
-            ReleaseVariableStats(vardata2);
-            PG_RETURN_FLOAT8((float8) selec);
-        }
-    }
-
+    // -- Retriving the sizes of each histogram. i.e. the number of intervals. -- //
     freq_nb_intervals1 = freq_sslot1.nvalues;
     freq_nb_intervals2 = freq_sslot2.nvalues;
 
+    // -- Allocating memory for the frequency histograms. -- //
     freq_values1 = (float *) palloc(sizeof(float) * freq_nb_intervals1);
     freq_values2 = (float *) palloc(sizeof(float) * freq_nb_intervals2);
 
-    for (i = 0; i < freq_nb_intervals1; ++i){
+    // -- Getting the float values for our frequencies. -- //
+    for (i = 0; i < freq_nb_intervals1; ++i)
         freq_values1[i] = DatumGetFloat8(freq_sslot1.values[i]);
-    }
-    for (i = 0; i < freq_nb_intervals2; ++i){
+    for (i = 0; i < freq_nb_intervals2; ++i)
         freq_values2[i] = DatumGetFloat8(freq_sslot2.values[i]);
-    }
 
-    // Debug print:
-    printf("SUUUUUUUUUUUUSHHHI:\n");
-    printf("Intervals 1:\n");
-	printf("frequencies = [");
-    for (i = 0; i < freq_nb_intervals1; i++){
-        printf("%f", (freq_values1[i]));
-        if (i < freq_nb_intervals1 - 1)
-        	printf(", ");
-    } 
-    printf("]\n");
+    _debug_print_frequencies(freq_values1, freq_nb_intervals1);
+    _debug_print_frequencies(freq_values2, freq_nb_intervals2);
 
-    // Debug print2:
-    printf("Intervals 2:\n");
-	printf("frequencies = [");
-    for (i = 0; i < freq_nb_intervals2; i++){
-        printf("%f", (freq_values2[i]));
-        if (i < freq_nb_intervals2 - 1)
-        	printf(", ");
-    } 
-    printf("]\n");
-    fflush(stdout);
-    
+    ///////////////////////////////////////
+	// OVERLAP JOIN SELECTIVY ESTIMATION //
+	///////////////////////////////////////
 
-    // ----- FREQUENCY HISTOGRAM ----- //
-
-
-	//SZYMON: TODO ALGO POUR JOIN SELECTIVITY ICI :3
-    selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2);
-
-
+    selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2);
 
     // -- FREE -- //
-    pfree(hist_lower1);
-    pfree(hist_upper1);
-    pfree(hist_lower2);
-    pfree(hist_upper2);
-
-    free_attstatsslot(&sslot1);
-    free_attstatsslot(&sslot2);
-
     ReleaseVariableStats(vardata1);
     ReleaseVariableStats(vardata2);
-
-    // -- FREQUENCY FREE -- //
-    pfree(freq_values1);
-    pfree(freq_values2);
+    free_attstatsslot(&sslot1);
+    free_attstatsslot(&sslot2);
     free_attstatsslot(&freq_sslot1);
     free_attstatsslot(&freq_sslot2);
+    pfree(freq_values1);
+    pfree(freq_values2);
     
     CLAMP_PROBABILITY(selec);
-    //Clamp a computed probability estimate (which may suffer from roundoff or
-    //estimation errors) to valid range. Argument must be a float variable.
-    /*
-    #define CLAMP_PROBABILITY(p) \
-        do { \
-            if (p < 0.0) \
-                p = 0.0; \
-            else if (p > 1.0) \
-                p = 1.0; \
-        } while (0)
-    */
-
+    
     PG_RETURN_FLOAT8((float8) selec); // szymon: actually returning just selectivity should work
 }
 
-
-Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2) {
+Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2) {
     Selectivity selec;
     selec = 0.005; // temporary, fixme
 
-    /* ... */
+    /*
+    // Interval's length
+    int length1; 
+    int length2;
     
+    length1 = roundUpDivision(max1 - min1, freq_nb_intervals1);
+    length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
+    
+    // Indexes
+    int idx1 = 0;
+    int idx2 = 0;
+
+    // Main
+    if (min1 < min2) {
+        for (in)
+        // calculer 'j'
+        // récupère min
+    }
+    j = 0
+    for idx in nbr_interval:
+        if ()
+
+    */
+
     return selec;
+}
+
+static int 
+roundUpDivision(int numerator, int divider){
+    int div;
+    div = numerator / divider;
+	if (numerator % divider)
+		div += 1;
+	return div
 }
 
 static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
@@ -311,8 +228,19 @@ static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up
 	return ! (challenge_up < low_bound || challenge_low > up_bound);
 }
 
+static void _debug_print_frequencies(float8* frequencies_vals, int size)
+{
+	printf("Frequencies = [");
+    for (i = 0; i < size; i++){
+        printf("%f", (frequencies_vals[i]));
+        if (i < size - 1)
+        	printf(", ");
+    }
+    printf("]\n");
+    fflush(stdout);
+}
 
-//szymon : osef de ce qu'il y a en dessous
+
 
 
 /*
@@ -369,73 +297,3 @@ contjoinsel(PG_FUNCTION_ARGS)
 {
 	PG_RETURN_FLOAT8(0.001);
 }
-
-
-// Szymon: copy-pasted here, may be useful to how stats are defined.
-// (from src/include/commands/vacuum.h)
-typedef struct SushiStats//VacAttrStats
-{
-	/*
-	 * These fields are set up by the main ANALYZE code before invoking the
-	 * type-specific typanalyze function.
-	 *
-	 * Note: do not assume that the data being analyzed has the same datatype
-	 * shown in attr, ie do not trust attr->atttypid, attlen, etc.  This is
-	 * because some index opclasses store a different type than the underlying
-	 * column/expression.  Instead use attrtypid, attrtypmod, and attrtype for
-	 * information about the datatype being fed to the typanalyze function.
-	 * Likewise, use attrcollid not attr->attcollation.
-	 */
-	Form_pg_attribute attr;		/* copy of pg_attribute row for column */
-	Oid			attrtypid;		/* type of data being analyzed */
-	int32		attrtypmod;		/* typmod of data being analyzed */
-	Form_pg_type attrtype;		/* copy of pg_type row for attrtypid */
-	Oid			attrcollid;		/* collation of data being analyzed */
-	MemoryContext anl_context;	/* where to save long-lived data */
-
-	/*
-	 * These fields must be filled in by the typanalyze routine, unless it
-	 * returns false.
-	 */
-	AnalyzeAttrComputeStatsFunc compute_stats;	/* function pointer */
-	int			minrows;		/* Minimum # of rows wanted for stats */
-	void	   *extra_data;		/* for extra type-specific data */
-
-	/*
-	 * These fields are to be filled in by the compute_stats routine. (They
-	 * are initialized to zero when the struct is created.)
-	 */
-	bool		stats_valid;
-	float4		stanullfrac;	/* fraction of entries that are NULL */
-	int32		stawidth;		/* average width of column values */
-	float4		stadistinct;	/* # distinct values */
-	int16		stakind[STATISTIC_NUM_SLOTS];
-	Oid			staop[STATISTIC_NUM_SLOTS];
-	Oid			stacoll[STATISTIC_NUM_SLOTS];
-	int			numnumbers[STATISTIC_NUM_SLOTS];
-	float4	   *stanumbers[STATISTIC_NUM_SLOTS];
-	int			numvalues[STATISTIC_NUM_SLOTS];
-	Datum	   *stavalues[STATISTIC_NUM_SLOTS];
-
-	/*
-	 * These fields describe the stavalues[n] element types. They will be
-	 * initialized to match attrtypid, but a custom typanalyze function might
-	 * want to store an array of something other than the analyzed column's
-	 * elements. It should then overwrite these fields.
-	 */
-	Oid			statypid[STATISTIC_NUM_SLOTS];
-	int16		statyplen[STATISTIC_NUM_SLOTS];
-	bool		statypbyval[STATISTIC_NUM_SLOTS];
-	char		statypalign[STATISTIC_NUM_SLOTS];
-
-	/*
-	 * These fields are private to the main ANALYZE code and should not be
-	 * looked at by type-specific functions.
-	 */
-	int			tupattnum;		/* attribute number within tuples */
-	HeapTuple  *rows;			/* access info for std fetch function */
-	TupleDesc	tupDesc;
-	Datum	   *exprvals;		/* access info for index fetch function */
-	bool	   *exprnulls;
-	int			rowstride;
-} SushiStats;
