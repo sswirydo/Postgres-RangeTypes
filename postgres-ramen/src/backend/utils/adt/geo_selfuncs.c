@@ -305,6 +305,12 @@ Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2,
     return selec;
 }
 
+static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
+{
+	// A && B <=> NOT (A << B OR A >> B)
+	return ! (challenge_up < low_bound || challenge_low > up_bound);
+}
+
 
 //szymon : osef de ce qu'il y a en dessous
 

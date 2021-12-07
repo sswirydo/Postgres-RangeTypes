@@ -6,7 +6,7 @@
     alex: sudo /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/compile-psql.sh /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/psql-script.sql /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/postgres-ramen 
     aure: 
     nico: 
-    szymon: sudo /media/sf_Postgres-RangeTypes/scripts/scripts/compile-psql.sh /media/sf_Postgres-RangeTypes/scripts/psql-script.sql /media/sf_Postgres-RangeTypes/postgres-ramen/
+    szymon: sudo /media/sf_Postgres-RangeTypes/scripts/compile-psql.sh /media/sf_Postgres-RangeTypes/scripts/psql-script.sql /media/sf_Postgres-RangeTypes/postgres-ramen/
 
 '
 

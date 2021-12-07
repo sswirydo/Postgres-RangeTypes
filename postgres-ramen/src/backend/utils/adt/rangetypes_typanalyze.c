@@ -31,6 +31,13 @@
 #include "utils/lsyscache.h"
 #include "utils/rangetypes.h"
 
+// -- H-417 OUR FUNCTIONS -- //
+static void ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows);
+static void count_frequencies(RangeBound* lowers, RangeBound* uppers, int* frequencies_vals, int* frequencies_intervals, int* sum_hist, int nb_of_intervals, int rows, int interval_length, int min);
+static void normalize_frequencies(float8* normalized_frequencies_vals, int* frequencies_vals, int* sum_hist, int nb_of_intervals, int rows);
+// ------------------------ //
+
+
 static int	float8_qsort_cmp(const void *a1, const void *a2);
 static int	range_bound_qsort_cmp(const void *a1, const void *a2, void *arg);
 static void compute_range_stats(VacAttrStats *stats,
@@ -96,29 +103,10 @@ range_bound_qsort_cmp(const void *a1, const void *a2, void *arg)
 }
 
 
-static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
-{
-	// A && B <=> NOT (A << B OR A >> B)
-	return ! (challenge_up < low_bound || challenge_low > up_bound);
-}
-
-
 static void
-ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows) {
-	// idée principale :
-	// 		on crée genre une liste abstraite qui va de la plus petite valeur à la plus grande valeur de ma colonne de ranges
-	// 		on divise cette liste en intervalles réguliers selon par ex la taille de cette liste (ou autre)
-	// 		on calcule le nombre de fois qu'une range pop dans un intervalle de la liste
-
-
-	//for aurelien & alex : x++ and ++X in forloop is the same. :)
-	//for (int x = 0; x < 5; x++) {printf("x: %d\n", x);}
-	//for (int y = 0; y < 5; ++y) {printf("y: %d\n", y);}
-	
-	
-	// TODO à féfléchir : Fixe le nbr d'intevral ou la longueur des intervals ?
-	int PERCENT_INTERVAL_LENGTH = 5; //FIXME arbitraire value : longueur interval = 5% de longueur tot
-		
+ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows)
+{
+	int PERCENT_INTERVAL_LENGTH = 5; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
 	int i;
 	int j;
 	int min;
@@ -127,48 +115,71 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int length;
 	int interval_length;
 	int nb_of_intervals;
+	int sum_hist;
 
 	int* frequencies_vals;
 	int* frequencies_intervals;
+	float8* normalized_frequencies_vals;
 	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
 	
-	// VERSION AURE (lower et upper sont triés)
 	min = (lowers)->val;
 	max = (uppers+rows-1)->val;
 
-
-	/// --- TODO TODO TODO --- //
-	length = max - min;
+	// -- CHOOSING THE INTERVAL LENGTH AND THE NUMBER OF INTERVALS -- //
+	length = max - min; 
 	interval_length = PERCENT_INTERVAL_LENGTH * length;
-	if (interval_length%100 == 0) { interval_length = interval_length/100; }
-	else {interval_length = 1 + interval_length/100; } // (+1 pour l'arrondi haut)
+	if (interval_length % 100 == 0)
+		interval_length = interval_length/100;
+	else
+		interval_length = 1 + interval_length/100; // +1 for rounding up.
 	nb_of_intervals = length/interval_length;
-	if (length % interval_length != 0) { 
-		nb_of_intervals++; // Arrondir au supérieur
-	}
-	// vérifier des trucs comme que la longueur d'intervale soit naturelle
-	//  + pas trop petite car trop de stockage et trop de temps
-	//  + ni trop grande sinon estimation sera bien trop grande
-	/// --- TODO TODO TODO --- //
+	if (length % interval_length != 0) 
+		nb_of_intervals++; // Rounding
 
+	// -- ALLOCATING MEMORY -- //
 	frequencies_vals = (int*) palloc(sizeof(int) * nb_of_intervals);
 	frequencies_intervals = (int*) palloc(sizeof(int) * nb_of_intervals);
+	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
 	memset(frequencies_vals, 0, sizeof(int) * nb_of_intervals);
 	memset(frequencies_intervals, 0, sizeof(int) * nb_of_intervals);
 
-	//// TODO Equidepth ou pas ?
+	// -- BUILDING THE FREQUENCY HISTOGRAM -- //
+	count_frequencies(lowers, uppers, frequencies_vals, frequencies_intervals, &sum_hist, nb_of_intervals, rows, interval_length, min);
+	normalize_frequencies(normalized_frequencies_vals, frequencies_vals, &sum_hist, nb_of_intervals, rows);
+
+	// -- STORING THE HISTOGRAM FOR LATER USAGE -- //
+	Datum* hist_frequencies_vals = (Datum *) palloc(sizeof(Datum) * nb_of_intervals);
+	for (i = 0; i < nb_of_intervals; ++i)
+		hist_frequencies_vals[i] = Float8GetDatum(normalized_frequencies_vals[i]);
+	stats->staop[slot_idx] = Float8LessOperator;
+	stats->stacoll[slot_idx] = InvalidOid;
+	stats->stavalues[slot_idx] = hist_frequencies_vals;
+	stats->numvalues[slot_idx] = nb_of_intervals;
+	stats->statypid[slot_idx] = FLOAT8OID;
+	stats->statyplen[slot_idx] = sizeof(float8);
+	stats->statypbyval[slot_idx] = FLOAT8PASSBYVAL;
+	stats->statypalign[slot_idx] = 'd';
+	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
 	
+	// -- FREEING ALLOCATED MEMORY -- //
+	pfree(frequencies_vals);
+	pfree(frequencies_intervals);
+	pfree(normalized_frequencies_vals);
+}
+
+static void
+count_frequencies(RangeBound* lowers, RangeBound* uppers, int* frequencies_vals, int* frequencies_intervals, int* sum_hist, int nb_of_intervals, int rows, int interval_length, int min)
+{
 	///////////////////////
 	// CLASSIC HISTOGRAM //
 	///////////////////////
 	
-	// Version Aure AKA Compiling 
-	
-	int sum_hist = 0; // used after for normalization
+	*(sum_hist) = 0;
+	int i;
 	int l = 0;
 	int u = 0;
 	int count = 0;
-	int sup = min-1;
+	int sup = min - 1;
 
 	for (i = 0; i < nb_of_intervals; ++i){
 		sup += interval_length;
@@ -178,116 +189,34 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 			l++;
 		}
 		frequencies_vals[i] = count;
-		sum_hist += count;
-		while((int)(uppers+u)->val <= sup+1 && u < rows){
+		*(sum_hist) += count;
+		while((int)(uppers+u)->val <= sup + 1 && u < rows){ // TO VERIFY '&& u < rows' (normaly not useful)
 			count--;
 			u++;
 		}
 	}
 
-	// Version Szymon AKA First // PETIT TRUCS A CORRIGER
-	/*
 	for (i = 0; i < nb_of_intervals; ++i){
-		frequencies_intervals[i] = (i+1)*interval_length; // ERROR -> FAUX, supposer que le premier interval commence à 0 (hors c'est un cas particulier)
-		for (j = 0; j < rows; ++j){
-			if (IsInRange(i*interval_length+1, ((i+1)*interval_length), (lowers+j)->val, (uppers+j)->val)) // range size 0 possible ? genre range(3,3) //btw [Ø,Ø] is empty
-				++(frequencies_vals[i]); 
-				sum_hist++;
-		}
+		printf("@@@@@@@ i:%d val:%d\n", i, frequencies_vals[i]);
 	}
-	*/
+}
 
-	// Debug print.
-	/*
-	printf("Intervals:\n");
-	for (i = 0; i < nb_of_intervals; ++i){
-		printf("[%d : %d]", frequencies_intervals[i]-interval_length+1, frequencies_intervals[i]);
-	}
-	printf("\nfrequencies = [");
-    	for (i = 0; i < nb_of_intervals; i++){
-        	printf("%d", (frequencies_vals[i]));
-        	if (i < nb_of_intervals - 1)
-        		printf(", ");
-    	} 
-    	printf("]\n");
-    	// printf("TOTAL COUNT : %d\n", sum_hist);
-	fflush(stdout);
-	*/
-	
+static void
+normalize_frequencies(float8* normalized_frequencies_vals, int* frequencies_vals, int* sum_hist, int nb_of_intervals, int rows)
+{
 	/////////////////////////////
 	// HISTOGRAM NORMALIZATION //
 	/////////////////////////////
 	
+	int i;
 	float ratio;
-	ratio = ((float) rows) / ((float) sum_hist); // divided by "sum_hist" (= percentage) -> multiply by "rows" (weighted)
+	ratio = ((float) rows) / (float) *(sum_hist); // divided by "sum_hist" (= percentage) -> multiply by "rows" (weighted)
 	
-	// Debug print. (aure)
-	/*
-	printf("DEBUG:\n");
-	for (i = 0; i < nb_of_intervals; ++i){
-		printf("[%d : %d] %d elem \n", frequencies_intervals[i]-interval_length+1, 			frequencies_intervals[i], frequencies_vals[i]);
-	} 
-	printf("SIZE : %d / %d = %f\n\n", rows, sum_hist, ratio);
-	fflush(stdout);
-	*/
-	
-	float8* normalized_frequencies_vals;
-	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
-	
-	// float debug = 0;
-	for (i = 0; i < nb_of_intervals; ++i){
-		
-		//printf("---BEFORE: %d\n", frequencies_vals[i]);
-		//debug += ((float) frequencies_vals[i]) * ratio;
-		normalized_frequencies_vals[i] = (float8) ((float) frequencies_vals[i]) * ratio;
-		//printf("---AFTER: %f\n", normalized_frequencies_vals[i]);
-
-	}
-	//printf("DGB : %f\n\n", debug); -> doit étre égale à 'rows' (à une erreur d'approx près, float)
-	//fflush(stdout);
-
-	Datum* hist_frequencies_vals = (Datum *) palloc(sizeof(Datum) * nb_of_intervals);
-	for (i = 0; i < nb_of_intervals; ++i) {
-		hist_frequencies_vals[i] = Float8GetDatum(normalized_frequencies_vals[i]);
-	}
-
-	stats->staop[slot_idx] = Float8LessOperator;
-	stats->stacoll[slot_idx] = InvalidOid;
-	stats->stavalues[slot_idx] = hist_frequencies_vals;
-	stats->numvalues[slot_idx] = nb_of_intervals;
-	stats->statypid[slot_idx] = FLOAT8OID;
-	stats->statyplen[slot_idx] = sizeof(float8);
-	stats->statypbyval[slot_idx] = FLOAT8PASSBYVAL;
-	stats->statypalign[slot_idx] = 'd';
-	//Store the fraction of empty ranges
-	//emptyfrac = (float4 *) palloc(sizeof(float4));
-	//*emptyfrac = ((double) empty_cnt) / ((double) non_null_cnt);
-	//stats->stanumbers[slot_idx] = emptyfrac;
-	//stats->numnumbers[slot_idx] = 1;
-	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
-
-	// --- (THIS IS FOR THE LENGTH HISTOGRAM) --- //
-	/*
-	stats->staop[slot_idx] = Float8LessOperator;
-	stats->stacoll[slot_idx] = InvalidOid;
-	stats->stavalues[slot_idx] = frequencies_intervals;
-	stats->numvalues[slot_idx] = nb_of_intervals;
-	stats->statypid[slot_idx] = FLOAT8OID;
-	stats->statyplen[slot_idx] = sizeof(float8);
-	stats->statypbyval[slot_idx] = FLOAT8PASSBYVAL;
-	stats->statypalign[slot_idx] = 'd';
-	//Store the fraction of empty ranges
-	//emptyfrac = (float4 *) palloc(sizeof(float4));
-	//*emptyfrac = ((double) empty_cnt) / ((double) non_null_cnt);
-	//stats->stanumbers[slot_idx] = emptyfrac;
-	//stats->numnumbers[slot_idx] = 1;
-	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM_LENGTH;
-	*/
-	
-
-	pfree(frequencies_vals);
-	pfree(normalized_frequencies_vals);
+	for (i = 0; i < nb_of_intervals; ++i)
+		normalized_frequencies_vals[i] = (float8) ((float) frequencies_vals[i] * ratio);
 }
+
+
 
 /*
  * compute_range_stats() -- compute statistics (if not empty) for (a) range(s) column(s)
