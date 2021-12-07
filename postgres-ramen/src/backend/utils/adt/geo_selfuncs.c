@@ -72,8 +72,8 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     bool        empty;
     AttStatsSlot freq_sslot1, freq_sslot2;
     int         freq_nb_intervals1, freq_nb_intervals2;
-    float8*        freq_values1 = NULL
-    float8*        freq_values2 = NULL
+    float8*        freq_values1 = NULL;
+    float8*        freq_values2 = NULL;
     Selectivity selec = 0.005; // Selectivity is a double. It is named Selectivity just to make its purpose more obvious.
 
     ///////////
@@ -114,7 +114,7 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
                              InvalidOid, ATTSTATSSLOT_VALUES))))
         {
             ReleaseVariableStats(vardata1); ReleaseVariableStats(vardata2);
-            pfree(sslot1); pfree(sslot2); pfree(freq_sslot1); pfree(freq_sslot2);
+            //pfree(sslot1); pfree(sslot2); pfree(freq_sslot1);pfree(freq_sslot2);
             PG_RETURN_FLOAT8((float8) selec);
         }
     }
@@ -168,7 +168,8 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 	// OVERLAP JOIN SELECTIVY ESTIMATION //
 	///////////////////////////////////////
 
-    selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2);
+    //selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2);
+    selec = 0.005;
 
     // -- FREE -- //
     ReleaseVariableStats(vardata1);
@@ -201,25 +202,27 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
     length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
     
     // Indexes
-    int idx1 = 0;
-    int idx2 = 0;
+    int idx1;
+    int idx2;
 
-    /*
+    ///*
 
     // Main (Scope : Du "plus grand min" au "plus petit max")
+    /*
     if (min1 > min2) {
         // calculer 'idx2' correspondant
         // récupérer min
-        i = 0;
-        int value;
-        value = min_2 + 1*length2
-        while() {
-            
+        idx2 = 0;
+        while(min2 < min1 && idx2 <= freq_nb_intervals2) { // 2e condition si aucun overlapse
+            min2 += lenght2;
+            idx2++;
         }
+        min2 -= length2; // min2 = nouveau min (en supprimant les intervals inutils)
+        idx2--; // idx2 est désormais l'index du premier interval de l'overlapse
     }
     else {
-        
     }
+
     if (max1 < max2) { //on a le plus petit des max -> trouver l'indice correspondant dans la table 2
         i = 0;
         while(freq_value2[i])
@@ -237,12 +240,51 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
     return selec; // [0;1]
 }
 
+static float calculateSelectivity(float8* freq_values1, float8* freq_values2, int start1, int start2, int end1, int end2, int size1, int size2){
+    float* freq_hist1;
+    float* freq_hist2;
+    int min1, min2;
+    int max1, max2;
+    float ratio;
+    if(size1 > size2){
+        freq_hist1 = freq_values1;
+        freq_hist2 = freq_values2;
+        min1 = start1;
+        min2 = start2;
+        max1 = end1;
+        max2 = end2;
+        ratio = (float)size1/size2;
+    }
+    else{
+        freq_hist1 = freq_values2;
+        freq_hist2 = freq_values1;
+        min1 = start2;
+        min2 = start1;
+        max1 = end2;
+        max2 = end1;
+        ratio = (float)size2/size1;
+    }
+
+    float limit = (float) ((min2+1) * ratio);
+    float total = 0;
+    for(int i = min1; i < max1; i ++){
+        if((float)i > limit){
+            i--;
+            min2++;
+            limit = (float) ((min2+1) * ratio);
+        }
+        total += freq_hist1[i] * freq_hist2[min2];
+    }
+
+    return total; //TODO normalize result
+}
+
 static int roundUpDivision(int numerator, int divider){
     int div;
     div = numerator / divider;
 	if (numerator % divider)
 		++div;
-	return div
+	return div;
 }
 
 static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
@@ -254,7 +296,7 @@ static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up
 static void _debug_print_frequencies(float8* frequencies_vals, int size)
 {
 	printf("Frequencies = [");
-    for (i = 0; i < size; i++){
+    for (int i = 0; i < size; i++){
         printf("%f", (frequencies_vals[i]));
         if (i < size - 1)
         	printf(", ");
