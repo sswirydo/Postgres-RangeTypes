@@ -57,7 +57,8 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     SpecialJoinInfo *sjinfo = (SpecialJoinInfo *) PG_GETARG_POINTER(4);
     Oid         collation = PG_GET_COLLATION();
 
-    double      selec = 0.005;
+    // en gros le type Selectivity c'est un double mais ça rend plus obvious le fait que ça sert à la selectivité xd
+    Selectivity selec = 0.005; 
 
     VariableStatData vardata1;
     VariableStatData vardata2;
@@ -222,15 +223,12 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     freq_values1 = (float *) palloc(sizeof(float) * freq_nb_intervals1);
     freq_values2 = (float *) palloc(sizeof(float) * freq_nb_intervals2);
 
-   printf("\n*****************\n");
-
     for (i = 0; i < freq_nb_intervals1; ++i){
         freq_values1[i] = DatumGetFloat8(freq_sslot1.values[i]);
     }
     for (i = 0; i < freq_nb_intervals2; ++i){
         freq_values2[i] = DatumGetFloat8(freq_sslot2.values[i]);
     }
-
 
     // Debug print:
     printf("SUUUUUUUUUUUUSHHHI:\n");
@@ -282,15 +280,29 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     free_attstatsslot(&freq_sslot2);
     
     CLAMP_PROBABILITY(selec);
-    PG_RETURN_FLOAT8((float8) selec); // VALUE BETWEEN 0 AND 1.
+    //Clamp a computed probability estimate (which may suffer from roundoff or
+    //estimation errors) to valid range. Argument must be a float variable.
+    /*
+    #define CLAMP_PROBABILITY(p) \
+        do { \
+            if (p < 0.0) \
+                p = 0.0; \
+            else if (p > 1.0) \
+                p = 1.0; \
+        } while (0)
+    */
+
+    PG_RETURN_FLOAT8((float8) selec); // szymon: actually returning just selectivity should work
 }
 
 
-double rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2) {
+Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2) {
+    Selectivity selec;
+    selec = 0.005; // temporary, fixme
+
+    /* ... */
     
-    /* TODO */
-    
-    return 0.005; //FIXME TEMP (return selectivity)
+    return selec;
 }
 
 

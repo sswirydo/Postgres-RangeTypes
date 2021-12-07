@@ -196,16 +196,16 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	}
 	
 	
-	printf("TOT COUNT : %d\n", tot_count);
+	// printf("TOTAL COUNT : %d\n", tot_count);
 	float ratio;
 	ratio = ((float) rows) / ((float) tot_count); // divided by "tot_count" (= pourcentage) -> multiply by "rows" (weighted)
 	float8* normalized_frequencies_vals;
 	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
 	for (i = 0; i < nb_of_intervals; ++i){
 		
-		printf("---BEFORE: %d\n", frequencies_vals[i]);
+		// printf("---BEFORE: %d\n", frequencies_vals[i]);
 		normalized_frequencies_vals[i] = (float8) ((float) frequencies_vals[i]) * ratio;
-		printf("---AFTER: %f\n", normalized_frequencies_vals[i]);
+		// printf("---AFTER: %f\n", normalized_frequencies_vals[i]);
 
 	}
 
