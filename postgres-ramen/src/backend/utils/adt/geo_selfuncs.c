@@ -40,7 +40,7 @@
 
 // -- H-417 OUR FUNCTIONS -- //
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
-Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
+Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
 static int roundUpDivision(int numerator, int divider);
 static void _debug_print_frequencies(float8* frequencies_vals, int size);
 // ------------------------- //
@@ -49,8 +49,7 @@ static void _debug_print_frequencies(float8* frequencies_vals, int size);
 /*
  * Range Overlaps Join Selectivity.
  */
-Datum
-rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
+Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 {
 	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
 
@@ -73,9 +72,13 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     bool        empty;
     AttStatsSlot freq_sslot1, freq_sslot2;
     int         freq_nb_intervals1, freq_nb_intervals2;
-    float*        freq_values1 = NULL
-    float*        freq_values2 = NULL
+    float8*        freq_values1 = NULL
+    float8*        freq_values2 = NULL
     Selectivity selec = 0.005; // Selectivity is a double. It is named Selectivity just to make its purpose more obvious.
+
+    ///////////
+	// INITs //
+	///////////
 
     // -- Retriving important variables. -- //
     get_join_variables(root, args, sjinfo, &vardata1, &vardata2, &join_is_reversed);
@@ -182,14 +185,17 @@ rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     PG_RETURN_FLOAT8((float8) selec); // szymon: actually returning just selectivity should work
 }
 
-Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2) {
+Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2) {
+    
     Selectivity selec;
-    selec = 0.005; // temporary, fixme
+    int i;
 
-    /*
-    // Interval's length
     int length1; 
     int length2;
+
+    selec = 0.005; // temporary, fixme
+
+    // Interval's length
     
     length1 = roundUpDivision(max1 - min1, freq_nb_intervals1);
     length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
@@ -198,27 +204,44 @@ Selectivity rangeoverlapsjoinsel_inner(float* freq_values1, float* freq_values2,
     int idx1 = 0;
     int idx2 = 0;
 
-    // Main
-    if (min1 < min2) {
-        for (in)
-        // calculer 'j'
-        // récupère min
+    /*
+
+    // Main (Scope : Du "plus grand min" au "plus petit max")
+    if (min1 > min2) {
+        // calculer 'idx2' correspondant
+        // récupérer min
+        i = 0;
+        int value;
+        value = min_2 + 1*length2
+        while() {
+            
+        }
     }
+    else {
+        
+    }
+    if (max1 < max2) { //on a le plus petit des max -> trouver l'indice correspondant dans la table 2
+        i = 0;
+        while(freq_value2[i])
+    }
+    else{ //on a le plus petit des max -> trouver l'indice correspondant dans la table 1
+
+    }
+
     j = 0
     for idx in nbr_interval:
         if ()
 
     */
 
-    return selec;
+    return selec; // [0;1]
 }
 
-static int 
-roundUpDivision(int numerator, int divider){
+static int roundUpDivision(int numerator, int divider){
     int div;
     div = numerator / divider;
 	if (numerator % divider)
-		div += 1;
+		++div;
 	return div
 }
 
