@@ -42,6 +42,8 @@
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
 Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
 static int roundUpDivision(int numerator, int divider);
+static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2);
+
 static void _debug_print_frequencies(float8* frequencies_vals, int size);
 // ------------------------- //
 
@@ -171,6 +173,30 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     //selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2);
     selec = 0.005;
 
+    /*
+        TESTS pliz pas supprimer
+    */
+
+    float8* trunc_freq1 = (float8*) palloc(4*sizeof(float8));
+    float8* trunc_freq2 = (float8*) palloc(3*sizeof(float8));
+
+    trunc_freq1[0] = freq_values1[0];
+    trunc_freq1[1] = freq_values1[1];
+    trunc_freq1[2] = freq_values1[2];
+    trunc_freq1[3] = freq_values1[3];
+
+    trunc_freq2[0] = freq_values2[0];
+    trunc_freq2[1] = freq_values2[1];
+    trunc_freq2[2] = freq_values2[2];
+
+    float result = calculateSelectivity(trunc_freq1,trunc_freq2,4,3);
+    printf("RESULT SELECT: %f\n",result);
+    fflush(stdout);
+
+    /*
+        jusqu'ici
+    */
+
     // -- FREE -- //
     ReleaseVariableStats(vardata1);
     ReleaseVariableStats(vardata2);
@@ -197,6 +223,13 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
     selec = 0.005; // temporary, fixme
 
     // Interval's length
+
+    // leng_tot_interval_1 = max1 - min1 
+    // leng__interval_1 = leng_tot_interval_1 / freq_nb_intervals1
+    // 3 * leng__interval_1
+    // min1=-45 max 45 val[0]
+
+    // comparer min1  min2 et max1 max3
     
     length1 = roundUpDivision(max1 - min1, freq_nb_intervals1);
     length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
@@ -240,40 +273,45 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
     return selec; // [0;1]
 }
 
-static float calculateSelectivity(float8* freq_values1, float8* freq_values2, int start1, int start2, int end1, int end2, int size1, int size2){
-    float* freq_hist1;
-    float* freq_hist2;
-    int min1, min2;
-    int max1, max2;
-    float ratio;
-    if(size1 > size2){
-        freq_hist1 = freq_values1;
-        freq_hist2 = freq_values2;
-        min1 = start1;
-        min2 = start2;
-        max1 = end1;
-        max2 = end2;
+//alex: on tronque les tables lorsqu'on a les bornes mins et max comme ca on part de 0 pour les 2 on a alors juste:
+//static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2)
+//on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
+//sinon lorsque valeures trop différentes problème pour la limit
+static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2){
+    float8* freq_hist1;
+    float8* freq_hist2;
+    int max;
+    float ratio; //ratio du changement (par exemple size1 = 4 et size2 = 3 -> ratio = 4/3 += 1.33)
+    if(size1 >= size2){
+        freq_hist1 = (float8*) palloc(size1*sizeof(float8));
+        freq_hist2 = (float8*) palloc(size2*sizeof(float8));
+        freq_hist1 = trunc_freq1;
+        freq_hist2 = trunc_freq2;
+        max = size1;
         ratio = (float)size1/size2;
     }
     else{
-        freq_hist1 = freq_values2;
-        freq_hist2 = freq_values1;
-        min1 = start2;
-        min2 = start1;
-        max1 = end2;
-        max2 = end1;
+        freq_hist1 = (float8*) palloc(size2*sizeof(float8));
+        freq_hist2 = (float8*) palloc(size1*sizeof(float8));
+        freq_hist1 = trunc_freq2;
+        freq_hist2 = trunc_freq1;
+        max = size2;
         ratio = (float)size2/size1;
     }
 
-    float limit = (float) ((min2+1) * ratio);
+    int j = 0;
+    float limit = (float) ratio; //first limit is (0+1)*(ratio) donc 1.33
     float total = 0;
-    for(int i = min1; i < max1; i ++){
-        if((float)i > limit){
+    for(int i = 0; i < max; i ++){
+        if((float)i > limit){ //on a depasse la limite, il faut incrementer j et  trunc[i]*trunc[j]
             i--;
-            min2++;
-            limit = (float) ((min2+1) * ratio);
+            j++;
+            limit = (float) (((float)j+1) * ratio); //on met a jour la nouelle limite
+            printf("LIMIT: %f\n",limit);
         }
-        total += freq_hist1[i] * freq_hist2[min2];
+        printf("INDEXES: %d -- %d\n", i, j);
+        printf("VALS: %f * %f\n",freq_hist1[i],freq_hist2[j]);
+        total += freq_hist1[i] * freq_hist2[j]; //add to total
     }
 
     return total; //TODO normalize result
