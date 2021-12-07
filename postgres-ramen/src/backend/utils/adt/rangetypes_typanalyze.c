@@ -131,6 +131,12 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int* frequencies_intervals;
 	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
 	
+	// VERSION AURE (lower et upper sont trié)
+	a = (lowers)->val;
+	b = (uppers+rows-1)->val;
+	
+	// ANCIENNE VERSION
+	/*
 	for (i = 0; i < rows; ++i) {
 		 a = (lowers+i)->val;
 		 b = (*(uppers+i)).val;
@@ -141,11 +147,15 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 		 if (max_value == NULL || b > max_value)
 			max_value = b;
 	}
+	*/
 
 	/// --- TODO TODO TODO --- //
 	length = b - a;
-	nb_of_intervals = length/2;//4; // FIXME temp
-	interval_length = length / nb_of_intervals; // ici on divise l'intervalle // à voir comment on divise // juste attention ne pas direct div par row sinon connerie
+	interval_length = 2+1;
+	nb_of_intervals = length/interval_length;//4; // FIXME temp-
+	if (length % interval_length != 0) { 
+		nb_of_intervals++; // Arrondir au supérieur
+	}
 	// vérifier des trucs comme que la longueur d'intervale soit naturelle
 	//  + pas trop petite car trop de stockage et trop de temps
 	//  + ni trop grande sinon estimation sera bien trop grande
@@ -159,42 +169,64 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	//// TODO Equidepth
 	
 	// Version Aure AKA Compiling 
-
+	
 	int tot_count = 0; // used after for normalization
 	int l = 0;
 	int u = 0;
 	int count = 0;
-	int sup = a;
-	/*
-	// ERREUR A DEBUG (ou delete :p)
+	int sup = a-1;
 
 	for (i = 0; i < nb_of_intervals; ++i){
 		sup += interval_length;
 		frequencies_intervals[i] = sup;
-		while((lowers+l)->val <= sup){
+		while((int)(lowers+l)->val <= sup && l < rows){
 			count++;
 			tot_count++;
 			l++;
 		}
 		frequencies_vals[i] = count;
-		while((uppers+u)->val < sup){
+		while((int)(uppers+u)->val <= sup+1 && u < rows){
 			count--;
 			u++;
 		}
 	}
-	*/
 
-	// Version Szymon AKA First
-	
+	// Version Szymon AKA First // A CORRIGER
+	/*
 	for (i = 0; i < nb_of_intervals; ++i){
-		frequencies_intervals[i] = (i+1)*interval_length;
+		frequencies_intervals[i] = (i+1)*interval_length; // ERROR -> FAUX, suppoer que le premier interval commence à 0 (hors c'est un cas particulier)
 		for (j = 0; j < rows; ++j){
 			if (IsInRange(i*interval_length+1, ((i+1)*interval_length), (lowers+j)->val, (uppers+j)->val)) // range size 0 possible ? genre range(3,3) //btw [Ø,Ø] is empty
 				++(frequencies_vals[i]); 
 				tot_count++;
 		}
 	}
+	*/
 	
+	// Debug print.
+	
+	printf("DEBUG:\n");
+	for (i = 0; i < nb_of_intervals; ++i){
+		printf("[%d : %d] %d elem \n", frequencies_intervals[i]-interval_length+1, frequencies_intervals[i], frequencies_vals[i]);
+	} 
+	fflush(stdout);
+	
+
+	// Debug print.
+	/*
+	printf("Intervals:\n");
+	for (i = 0; i < nb_of_intervals; ++i){
+		printf("[%d : %d]", frequencies_intervals[i]-interval_length+1, frequencies_intervals[i]);
+	}
+	printf("\nfrequencies = [");
+    for (i = 0; i < nb_of_intervals; i++){
+        printf("%d", (frequencies_vals[i]));
+        if (i < nb_of_intervals - 1)
+        	printf(", ");
+    } 
+    printf("]\n");
+	fflush(stdout);
+	*/
 	
 	// printf("TOTAL COUNT : %d\n", tot_count);
 	float ratio;
@@ -213,23 +245,6 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	for (i = 0; i < nb_of_intervals; ++i) {
 		hist_frequencies_vals[i] = Float8GetDatum(normalized_frequencies_vals[i]);
 	}
-
-
-	// Debug print.
-	/*
-	printf("Intervals:\n");
-	for (i = 0; i < nb_of_intervals; ++i){
-		printf("[%d - %d]", i*interval_length, ((i+1)*interval_length)-1);
-	}
-	printf("\nfrequencies = [");
-    for (i = 0; i < nb_of_intervals; i++){
-        printf("%f", (frequencies_vals[i]));
-        if (i < nb_of_intervals - 1)
-        	printf(", ");
-    } 
-    printf("]\n");
-	fflush(stdout);
-	*/
 
 	stats->staop[slot_idx] = Float8LessOperator;
 	stats->stacoll[slot_idx] = InvalidOid;

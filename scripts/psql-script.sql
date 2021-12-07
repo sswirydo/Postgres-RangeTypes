@@ -6,16 +6,17 @@ CREATE TABLE tablealacon(r int4range);
 INSERT INTO tablealacon SELECT int4range(0, s+1, '[)') FROM generate_series(0, 40) AS s; -- frequencies = [40, 30, 20, 10]
 -- '(' or ')' = borne non-comprise
 -- '[' or ']' = born comprise
-VACUUM ANALYZE tablealacon;
-SELECT * FROM tablealacon;
+--VACUUM ANALYZE tablealacon;
+--SELECT * FROM tablealacon;
 
 CREATE TABLE temp1(r int4range);
 CREATE TABLE temp2(r int4range);
-INSERT INTO temp1 SELECT int4range(s*5, s*8) FROM generate_series(0, 50) AS s; -- lows: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50] -- ups: [8, 16, 24, 32, 40, 48, 56, 64, 72, 80]
+INSERT INTO temp1 SELECT int4range(s*5, s*8) FROM generate_series(0, 6) AS s; -- lows: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50] -- ups: [8, 16, 24, 32, 40, 48, 56, 64, 72, 80]
 -- en bonus gérer si int4range(supérieur, inférieur) 
-INSERT INTO temp2 SELECT int4range((-s)*3, s*4) FROM generate_series(0, 50) AS s;
+INSERT INTO temp2 SELECT int4range((-s)*3, s*4) FROM generate_series(0, 6) AS s;
 
-
+SELECT * FROM temp1;
+SELECT * FROM temp2;
 
 VACUUM ANALYZE temp1; -- per column
 VACUUM ANALYZE temp2;
