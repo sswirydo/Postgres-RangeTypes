@@ -114,14 +114,15 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	//for aurelien & alex : x++ and ++X in forloop is the same. :)
 	//for (int x = 0; x < 5; x++) {printf("x: %d\n", x);}
 	//for (int y = 0; y < 5; ++y) {printf("y: %d\n", y);}
+	
+	
+	// TODO à féfléchir : Fixe le nbr d'intevral ou la longueur des intervals ?
+	int PERCENT_INTERVAL_LENGTH = 5; //FIXME arbitraire value : longueur interval = 5% de longueur tot
 		
 	int i;
 	int j;
-	int min_value = NULL;
-	int max_value = NULL;
-
-	int a;
-	int b;
+	int min;
+	int max;
 
 	int length;
 	int interval_length;
@@ -131,28 +132,17 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int* frequencies_intervals;
 	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
 	
-	// VERSION AURE (lower et upper sont trié)
-	a = (lowers)->val;
-	b = (uppers+rows-1)->val;
-	
-	// ANCIENNE VERSION
-	/*
-	for (i = 0; i < rows; ++i) {
-		 a = (lowers+i)->val;
-		 b = (*(uppers+i)).val;
+	// VERSION AURE (lower et upper sont triés)
+	min = (lowers)->val;
+	max = (uppers+rows-1)->val;
 
-		 if (min_value == NULL || a < min_value)
-			min_value = a;
-
-		 if (max_value == NULL || b > max_value)
-			max_value = b;
-	}
-	*/
 
 	/// --- TODO TODO TODO --- //
-	length = b - a;
-	interval_length = 2+1;
-	nb_of_intervals = length/interval_length;//4; // FIXME temp-
+	length = max - min;
+	interval_length = PERCENT_INTERVAL_LENGTH * length;
+	if (interval_length%100 == 0) { interval_length = interval_length/100; }
+	else {interval_length = 1 + interval_length/100; } // (+1 pour l'arrondi haut)
+	nb_of_intervals = length/interval_length;
 	if (length % interval_length != 0) { 
 		nb_of_intervals++; // Arrondir au supérieur
 	}
@@ -166,51 +156,46 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	memset(frequencies_vals, 0, sizeof(int) * nb_of_intervals);
 	memset(frequencies_intervals, 0, sizeof(int) * nb_of_intervals);
 
-	//// TODO Equidepth
+	//// TODO Equidepth ou pas ?
+	
+	///////////////////////
+	// CLASSIC HISTOGRAM //
+	///////////////////////
 	
 	// Version Aure AKA Compiling 
 	
-	int tot_count = 0; // used after for normalization
+	int sum_hist = 0; // used after for normalization
 	int l = 0;
 	int u = 0;
 	int count = 0;
-	int sup = a-1;
+	int sup = min-1;
 
 	for (i = 0; i < nb_of_intervals; ++i){
 		sup += interval_length;
 		frequencies_intervals[i] = sup;
 		while((int)(lowers+l)->val <= sup && l < rows){
 			count++;
-			tot_count++;
 			l++;
 		}
 		frequencies_vals[i] = count;
+		sum_hist += count;
 		while((int)(uppers+u)->val <= sup+1 && u < rows){
 			count--;
 			u++;
 		}
 	}
 
-	// Version Szymon AKA First // A CORRIGER
+	// Version Szymon AKA First // PETIT TRUCS A CORRIGER
 	/*
 	for (i = 0; i < nb_of_intervals; ++i){
-		frequencies_intervals[i] = (i+1)*interval_length; // ERROR -> FAUX, suppoer que le premier interval commence à 0 (hors c'est un cas particulier)
+		frequencies_intervals[i] = (i+1)*interval_length; // ERROR -> FAUX, supposer que le premier interval commence à 0 (hors c'est un cas particulier)
 		for (j = 0; j < rows; ++j){
 			if (IsInRange(i*interval_length+1, ((i+1)*interval_length), (lowers+j)->val, (uppers+j)->val)) // range size 0 possible ? genre range(3,3) //btw [Ø,Ø] is empty
 				++(frequencies_vals[i]); 
-				tot_count++;
+				sum_hist++;
 		}
 	}
 	*/
-	
-	// Debug print.
-	
-	printf("DEBUG:\n");
-	for (i = 0; i < nb_of_intervals; ++i){
-		printf("[%d : %d] %d elem \n", frequencies_intervals[i]-interval_length+1, frequencies_intervals[i], frequencies_vals[i]);
-	} 
-	fflush(stdout);
-	
 
 	// Debug print.
 	/*
@@ -219,27 +204,47 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 		printf("[%d : %d]", frequencies_intervals[i]-interval_length+1, frequencies_intervals[i]);
 	}
 	printf("\nfrequencies = [");
-    for (i = 0; i < nb_of_intervals; i++){
-        printf("%d", (frequencies_vals[i]));
-        if (i < nb_of_intervals - 1)
-        	printf(", ");
-    } 
-    printf("]\n");
+    	for (i = 0; i < nb_of_intervals; i++){
+        	printf("%d", (frequencies_vals[i]));
+        	if (i < nb_of_intervals - 1)
+        		printf(", ");
+    	} 
+    	printf("]\n");
+    	// printf("TOTAL COUNT : %d\n", sum_hist);
 	fflush(stdout);
 	*/
 	
-	// printf("TOTAL COUNT : %d\n", tot_count);
+	/////////////////////////////
+	// HISTOGRAM NORMALIZATION //
+	/////////////////////////////
+	
 	float ratio;
-	ratio = ((float) rows) / ((float) tot_count); // divided by "tot_count" (= pourcentage) -> multiply by "rows" (weighted)
+	ratio = ((float) rows) / ((float) sum_hist); // divided by "sum_hist" (= percentage) -> multiply by "rows" (weighted)
+	
+	// Debug print. (aure)
+	/*
+	printf("DEBUG:\n");
+	for (i = 0; i < nb_of_intervals; ++i){
+		printf("[%d : %d] %d elem \n", frequencies_intervals[i]-interval_length+1, 			frequencies_intervals[i], frequencies_vals[i]);
+	} 
+	printf("SIZE : %d / %d = %f\n\n", rows, sum_hist, ratio);
+	fflush(stdout);
+	*/
+	
 	float8* normalized_frequencies_vals;
 	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
+	
+	// float debug = 0;
 	for (i = 0; i < nb_of_intervals; ++i){
 		
-		// printf("---BEFORE: %d\n", frequencies_vals[i]);
+		//printf("---BEFORE: %d\n", frequencies_vals[i]);
+		//debug += ((float) frequencies_vals[i]) * ratio;
 		normalized_frequencies_vals[i] = (float8) ((float) frequencies_vals[i]) * ratio;
-		// printf("---AFTER: %f\n", normalized_frequencies_vals[i]);
+		//printf("---AFTER: %f\n", normalized_frequencies_vals[i]);
 
 	}
+	//printf("DGB : %f\n\n", debug); -> doit étre égale à 'rows' (à une erreur d'approx près, float)
+	//fflush(stdout);
 
 	Datum* hist_frequencies_vals = (Datum *) palloc(sizeof(Datum) * nb_of_intervals);
 	for (i = 0; i < nb_of_intervals; ++i) {
