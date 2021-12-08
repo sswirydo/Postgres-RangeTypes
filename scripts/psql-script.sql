@@ -18,14 +18,25 @@ INSERT INTO temp2 SELECT int4range((-s)*3, s*4) FROM generate_series(0, 6) AS s;
 SELECT * FROM temp1;
 SELECT * FROM temp2;
 
-VACUUM ANALYZE temp1; -- per column
-VACUUM ANALYZE temp2;
+--VACUUM ANALYZE temp1; -- per column
+--VACUUM ANALYZE temp2;
 
+CREATE TABLE reservation (room int, during tsrange);
+INSERT INTO reservation VALUES
+    (1108, '[2010-01-01 14:30, 2010-01-01 15:30)');
+INSERT INTO reservation VALUES
+    (8765, '[2005-01-01 14:30, 2016-01-01 18:30)');
+INSERT INTO reservation VALUES
+    (987, '[2009-01-01 14:30, 2011-01-01 15:30)');
+INSERT INTO reservation VALUES
+    (4567, '[2010-01-01 14:30, 2030-01-01 15:30)');
 
+VACUUM ANALYZE reservation;
 
 -- EXPLAIN SELECT count(*) FROM temp1 t1, temp2 t2 WHERE t1.r && int4range(60, 100);
 
-EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM temp1 t1, temp2 t2 WHERE t1.r && t2.r;
+-- EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM temp1 t1, temp2 t2 WHERE t1.r && t2.r;
+-- EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM temp1 t1, temp2 t2 WHERE t1.r && t2.r;
 
 
 -- SELECT * FROM pg_stats WHERE tablename = temp1;-- AND attname = r;

@@ -170,7 +170,7 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 	// OVERLAP JOIN SELECTIVY ESTIMATION //
 	///////////////////////////////////////
 
-    //selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2);
+    // selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2);
     selec = 0.005;
 
     /*
@@ -180,14 +180,19 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     float8* trunc_freq1 = (float8*) palloc(4*sizeof(float8));
     float8* trunc_freq2 = (float8*) palloc(3*sizeof(float8));
 
-    trunc_freq1[0] = freq_values1[1];
-    trunc_freq1[1] = freq_values1[2];
-    trunc_freq1[2] = freq_values1[3];
-    trunc_freq1[3] = freq_values1[4];
+    // min1 = min2 = 0
+    // max1 = max2
 
-    trunc_freq2[0] = freq_values2[3];
-    trunc_freq2[1] = freq_values2[4];
-    trunc_freq2[2] = freq_values2[5];
+
+
+    trunc_freq1[0] = freq_values1[0];
+    trunc_freq1[1] = freq_values1[1];
+    trunc_freq1[2] = freq_values1[2];
+    trunc_freq1[3] = freq_values1[3];
+
+    trunc_freq2[0] = freq_values2[0];
+    trunc_freq2[1] = freq_values2[1];
+    trunc_freq2[2] = freq_values2[2];
 
     Selectivity result = calculateSelectivity(trunc_freq1, trunc_freq2, 4, 3);
     printf("RESULT SELECT: %f\n",result);
@@ -210,6 +215,23 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     CLAMP_PROBABILITY(selec);
     
     PG_RETURN_FLOAT8((float8) selec); // szymon: actually returning just selectivity should work
+}
+
+Selectivity patateDeSzymon(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
+{
+    int interval_length1 = (max1 - min1) / freq_nb_intervals1;
+    int interval_length2 = (max2 - min2) / freq_nb_intervals2;
+
+    int x, y;
+
+    int val;
+    //IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
+
+    x = 0;
+    y = 0;
+
+    while (true) {}
+
 }
 
 Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2) {
@@ -238,8 +260,13 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
     int idx1;
     int idx2;
 
-    ///*
+    /*
 
+    */
+
+
+
+    ///*
     // Main (Scope : Du "plus grand min" au "plus petit max")
     /*
     if (min1 > min2) {
@@ -253,8 +280,7 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
         min2 -= length2; // min2 = nouveau min (en supprimant les intervals inutils)
         idx2--; // idx2 est désormais l'index du premier interval de l'overlapse
     }
-    else {
-    }
+    else {}
 
     if (max1 < max2) { //on a le plus petit des max -> trouver l'indice correspondant dans la table 2
         i = 0;
@@ -267,16 +293,17 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
     j = 0
     for idx in nbr_interval:
         if ()
-
     */
 
     return selec; // [0;1]
 }
 
+
 //alex: on tronque les tables lorsqu'on a les bornes mins et max comme ca on part de 0 pour les 2 on a alors juste:
 //static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2)
 //on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
 //sinon lorsque valeures trop différentes problème pour la limit
+//O(max(size1,size2))
 static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2){
     float8* freq_hist1;
     float8* freq_hist2;
