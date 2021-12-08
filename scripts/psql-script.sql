@@ -33,7 +33,7 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM floats1 t1, floats2 t2 WHERE t1.
 
 DROP table integers1;
 DROP table integers2;
-*/s
+*/
 
 -- TIMESTAMP VALUES --
 /*
