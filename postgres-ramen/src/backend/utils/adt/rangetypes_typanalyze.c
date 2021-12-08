@@ -195,10 +195,6 @@ count_frequencies(RangeBound* lowers, RangeBound* uppers, int* frequencies_vals,
 			u++;
 		}
 	}
-
-	for (i = 0; i < nb_of_intervals; ++i){
-		printf("@@@@@@@ i:%d val:%d\n", i, frequencies_vals[i]);
-	}
 }
 
 static void

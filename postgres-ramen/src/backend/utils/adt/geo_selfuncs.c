@@ -42,8 +42,9 @@
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
 Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
 static int roundUpDivision(int numerator, int divider);
+Selectivity nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
 static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2);
-
+static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound);
 static void _debug_print_frequencies(float8* frequencies_vals, int size);
 // ------------------------- //
 
@@ -136,14 +137,14 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     // -- Deserializing ranges in order to obtain RangeBounds. -- // --> RangeBounds are ordered from lowest to highest.
     range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[0]), &r_min1, &buffer, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
     range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[nhist1-1]), &buffer, &r_max1, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
-    range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[0]), &r_min2, &buffer, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
+    range_deserialize(typcache, DatumGetRangeTypeP(sslot2.values[0]), &r_min2, &buffer, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
     range_deserialize(typcache, DatumGetRangeTypeP(sslot2.values[nhist2-1]), &buffer, &r_max2, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
 
     // -- Getting the integer values from range bounds -- //
     min1 = r_min1.val;
     min2 = r_min2.val;
     max1 = r_max1.val;
-    max1 = r_max2.val;
+    max2 = r_max2.val;
 
     /////////////////////////
 	// FREQUENCY HISTOGRAM //
@@ -170,20 +171,17 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 	// OVERLAP JOIN SELECTIVY ESTIMATION //
 	///////////////////////////////////////
 
-    // selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2);
-    selec = 0.005;
+    if (IsInRange(min1, max1, min2, max2)){
+        selec = nameTBD(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2, min1, min2, max1, max2);
+    }
 
+    
+    
+    // TESTS pliz pas supprimer
     /*
-        TESTS pliz pas supprimer
-    */
-
+    selec = 0.005;
     float8* trunc_freq1 = (float8*) palloc(4*sizeof(float8));
     float8* trunc_freq2 = (float8*) palloc(3*sizeof(float8));
-
-    // min1 = min2 = 0
-    // max1 = max2
-
-
 
     trunc_freq1[0] = freq_values1[0];
     trunc_freq1[1] = freq_values1[1];
@@ -198,9 +196,10 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     printf("RESULT SELECT: %f\n",result);
     fflush(stdout);
 
-    /*
-        jusqu'ici
+    pfree(trunc_freq1); // szymon: encore une fois j'ai du free apres alex jpp
+    pfree(trunc_freq2);
     */
+    // jusqu'ici
 
     // -- FREE -- //
     ReleaseVariableStats(vardata1);
@@ -217,25 +216,115 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     PG_RETURN_FLOAT8((float8) selec); // szymon: actually returning just selectivity should work
 }
 
-Selectivity patateDeSzymon(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
+Selectivity nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
 {
+    Selectivity result = 0.005;
     int interval_length1 = (max1 - min1) / freq_nb_intervals1;
     int interval_length2 = (max2 - min2) / freq_nb_intervals2;
 
-    int x, y;
+    int x_low, y_low;
+    int x_high, y_high;
 
-    int val;
-    //IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
+    int min_val1 = min1;
+    int min_val2 = min2;
 
-    x = 0;
-    y = 0;
+    int max_val1 = max1;
+    int max_val2 = max2;
 
-    while (true) {}
+    int in_range;
+    int stop = 0;
 
+    bool overlap = IsInRange(min1, max1, min2, max2);
+
+    x_low = 0;
+    y_low = 0;
+    x_high = freq_nb_intervals1 - 1;
+    y_high = freq_nb_intervals2 - 1;
+
+    // -- LOW -- //
+    in_range = IsInRange(min_val1, min_val1 + interval_length1, min_val2, min_val2 + interval_length2);
+    while (! in_range) {
+        if (min_val1 < min_val2){
+            if (! in_range){
+                min_val1 += interval_length1;
+                ++x_low;
+            }
+        }
+        else if (min_val2 < min_val1){
+            if (! in_range){
+                min_val2 += interval_length2;
+                ++y_low;
+            }
+        }
+        else {printf("???"); ++x_low;  ++y_low;}
+        in_range = IsInRange(min_val1, min_val1 + interval_length1, min_val2, min_val2 + interval_length2);
+
+        if (x_low == freq_nb_intervals1 | y_low == freq_nb_intervals2) {
+            printf(">>> STOP LOW.\n");
+            stop++;
+            break;
+        }
+    }
+    
+    // -- HIGH -- //
+    in_range = IsInRange(max_val1 - interval_length1, max_val1, max_val2 - interval_length2, max_val2);
+    while (! in_range) {
+        if (max_val1 > max_val2){
+            if (! in_range){
+                max_val1 -= interval_length1;
+                --x_high;
+            }
+        }
+        else if (max_val2 > max_val1){
+            if (! in_range){
+                max_val2 -= interval_length2;
+                --y_high;
+            }
+        }
+        else {printf("???"); --x_high; --y_high;}
+        in_range = IsInRange(max_val1 - interval_length1, max_val1, max_val2 - interval_length2, max_val2);
+
+        if (x_high == 0 | y_high == 0) {
+            printf(">>> STOP HIGH.\n");
+            stop++;
+            break;
+        }
+    }
+
+    if (! stop) {
+        int i;
+        int new_size1 = x_high - x_low;
+        int new_size2 = y_high - y_low;
+        float8* trunc_freq1 = (float8*) palloc(sizeof(float8) * new_size1);
+        float8* trunc_freq2 = (float8*) palloc(sizeof(float8) * new_size2);
+
+        for (i = x_low; i <= x_high; ++i){
+            trunc_freq1[i - x_low] = freq_values1[i];
+        }
+        for (i = y_low; i <= y_high; ++i){
+            trunc_freq2[i - y_low] = freq_values2[i];
+        }
+
+        _debug_print_frequencies(trunc_freq1, new_size1);
+        _debug_print_frequencies(trunc_freq2, new_size2);
+
+        printf(">>>>>salut2\n");
+        result = calculateSelectivity(trunc_freq1, trunc_freq2, new_size1, new_size2);
+
+        printf("------------xoxo lets go %f", result);
+
+        pfree(trunc_freq1);
+        pfree(trunc_freq2);
+    }
+
+    
+
+    return result;
 }
 
 Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2) {
     
+    /*
     Selectivity selec;
     int i;
 
@@ -295,7 +384,7 @@ Selectivity rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values
         if ()
     */
 
-    return selec; // [0;1]
+    return 0.005; // [0;1]
 }
 
 
@@ -341,6 +430,8 @@ static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2
         printf("VALS: %f * %f\n",freq_hist1[i],freq_hist2[j]);
         total += freq_hist1[i] * freq_hist2[j]; //add to total
     }
+
+    printf(">>>> helllo");
 
     return (double) total; //TODO normalize result
 }
