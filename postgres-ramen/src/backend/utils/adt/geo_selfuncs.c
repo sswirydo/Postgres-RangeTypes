@@ -180,16 +180,16 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     float8* trunc_freq1 = (float8*) palloc(4*sizeof(float8));
     float8* trunc_freq2 = (float8*) palloc(3*sizeof(float8));
 
-    trunc_freq1[0] = freq_values1[0];
-    trunc_freq1[1] = freq_values1[1];
-    trunc_freq1[2] = freq_values1[2];
-    trunc_freq1[3] = freq_values1[3];
+    trunc_freq1[0] = freq_values1[1];
+    trunc_freq1[1] = freq_values1[2];
+    trunc_freq1[2] = freq_values1[3];
+    trunc_freq1[3] = freq_values1[4];
 
-    trunc_freq2[0] = freq_values2[0];
-    trunc_freq2[1] = freq_values2[1];
-    trunc_freq2[2] = freq_values2[2];
+    trunc_freq2[0] = freq_values2[3];
+    trunc_freq2[1] = freq_values2[4];
+    trunc_freq2[2] = freq_values2[5];
 
-    float result = calculateSelectivity(trunc_freq1,trunc_freq2,4,3);
+    Selectivity result = calculateSelectivity(trunc_freq1, trunc_freq2, 4, 3);
     printf("RESULT SELECT: %f\n",result);
     fflush(stdout);
 
@@ -281,7 +281,8 @@ static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2
     float8* freq_hist1;
     float8* freq_hist2;
     int max;
-    float ratio; //ratio du changement (par exemple size1 = 4 et size2 = 3 -> ratio = 4/3 += 1.33)
+    int i, j;
+    float8 ratio; //ratio du changement (par exemple size1 = 4 et size2 = 3 -> ratio = 4/3 += 1.33)
     if(size1 >= size2){
         freq_hist1 = (float8*) palloc(size1*sizeof(float8));
         freq_hist2 = (float8*) palloc(size2*sizeof(float8));
@@ -299,14 +300,14 @@ static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2
         ratio = (float)size2/size1;
     }
 
-    int j = 0;
-    float limit = (float) ratio; //first limit is (0+1)*(ratio) donc 1.33
-    float total = 0;
-    for(int i = 0; i < max; i ++){
-        if((float)i > limit){ //on a depasse la limite, il faut incrementer j et  trunc[i]*trunc[j]
+    j = 0;
+    float8 limit = (float8) ratio; //first limit is (0+1)*(ratio) donc 1.33
+    float8 total = 0;
+    for(i = 0; i < max; i ++){
+        if((float8)i > limit){ //on a depasse la limite, il faut incrementer j et  trunc[i]*trunc[j]
             i--;
             j++;
-            limit = (float) (((float)j+1) * ratio); //on met a jour la nouelle limite
+            limit = (float8) (((float8)j+1) * ratio); //on met a jour la nouvelle limite
             printf("LIMIT: %f\n",limit);
         }
         printf("INDEXES: %d -- %d\n", i, j);
@@ -314,7 +315,7 @@ static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2
         total += freq_hist1[i] * freq_hist2[j]; //add to total
     }
 
-    return total; //TODO normalize result
+    return (double) total; //TODO normalize result
 }
 
 static int roundUpDivision(int numerator, int divider){
