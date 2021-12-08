@@ -7,8 +7,12 @@
 -- INTEGER VALUES --
 CREATE TABLE integers1(r int4range);
 CREATE TABLE integers2(r int4range);
-INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(0, 10) AS s;
-INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(0, 10) AS s;
+INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 10000) AS s;
+INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 10000) AS s;
+--INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 10) AS s;
+--INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 10) AS s;
+
+-- SELECT * FROM integers1;
 
 VACUUM ANALYZE integers1;
 VACUUM ANALYZE integers2;

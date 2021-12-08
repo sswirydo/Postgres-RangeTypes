@@ -40,7 +40,6 @@
 
 // -- H-417 OUR FUNCTIONS -- //
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
-float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
 static int roundUpDivision(int numerator, int divider);
 float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
 float8 calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2);
@@ -55,7 +54,7 @@ static void _debug_print_frequencies(float8* frequencies_vals, int size);
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 {
 	// FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
-
+    
     PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
     Oid         operator = PG_GETARG_OID(1);
     List       *args = (List *) PG_GETARG_POINTER(2);
@@ -150,8 +149,6 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 	// FREQUENCY HISTOGRAM //
 	/////////////////////////
 
-    
-
     // -- Retriving the sizes of each histogram. i.e. the number of intervals. -- //
     freq_nb_intervals1 = freq_sslot1.nvalues;
     freq_nb_intervals2 = freq_sslot2.nvalues;
@@ -167,10 +164,8 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     for (i = 0; i < freq_nb_intervals2; ++i)
         freq_values2[i] = DatumGetFloat8(freq_sslot2.values[i]);
 
-    
-
-    _debug_print_frequencies(freq_values1, freq_nb_intervals1);
-    _debug_print_frequencies(freq_values2, freq_nb_intervals2);
+    // _debug_print_frequencies(freq_values1, freq_nb_intervals1);
+    // _debug_print_frequencies(freq_values2, freq_nb_intervals2);
 
     ///////////////////////////////////////
 	// OVERLAP JOIN SELECTIVY ESTIMATION //
@@ -194,7 +189,7 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 
     fflush(stdout);
 
-    PG_RETURN_FLOAT8(0.005);
+    PG_RETURN_FLOAT8(selec);
 }
 
 float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
@@ -287,11 +282,11 @@ float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals
         }
 
         // -- DEBUG -- //
-        _debug_print_frequencies(trunc_freq1, new_size1);
-        _debug_print_frequencies(trunc_freq2, new_size2);
-        printf(">>>>>DEBUG:\n");
-        printf("---vals1: %d %d, %d %d\n", x_low, x_high, y_low, y_high);  
-        printf("---vals2: %d, %d\n", new_size1, new_size2);
+        // _debug_print_frequencies(trunc_freq1, new_size1);
+        // _debug_print_frequencies(trunc_freq2, new_size2);
+        // printf(">>>>>DEBUG:\n");
+        // printf("---vals1: %d %d, %d %d\n", x_low, x_high, y_low, y_high);  
+        // printf("---vals2: %d, %d\n", new_size1, new_size2);
 
         result = calculateSelectivity(trunc_freq1, trunc_freq2, new_size1, new_size2);
 
@@ -300,70 +295,6 @@ float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals
     }
     return result;
 }
-
-float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2) {
-    
-    /*
-    Selectivity selec;
-    int i;
-
-    int length1; 
-    int length2;
-
-    selec = 0.005; // temporary, fixme
-
-    // Interval's length
-
-    // leng_tot_interval_1 = max1 - min1 
-    // leng__interval_1 = leng_tot_interval_1 / freq_nb_intervals1
-    // 3 * leng__interval_1
-    // min1=-45 max 45 val[0]
-
-    // comparer min1  min2 et max1 max3
-    
-    length1 = roundUpDivision(max1 - min1, freq_nb_intervals1);
-    length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
-    
-    // Indexes
-    int idx1;
-    int idx2;
-
-    /*
-
-    */
-
-    ///*
-    // Main (Scope : Du "plus grand min" au "plus petit max")
-    /*
-    if (min1 > min2) {
-        // calculer 'idx2' correspondant
-        // récupérer min
-        idx2 = 0;
-        while(min2 < min1 && idx2 <= freq_nb_intervals2) { // 2e condition si aucun overlapse
-            min2 += lenght2;
-            idx2++;
-        }
-        min2 -= length2; // min2 = nouveau min (en supprimant les intervals inutils)
-        idx2--; // idx2 est désormais l'index du premier interval de l'overlapse
-    }
-    else {}
-
-    if (max1 < max2) { //on a le plus petit des max -> trouver l'indice correspondant dans la table 2
-        i = 0;
-        while(freq_value2[i])
-    }
-    else{ //on a le plus petit des max -> trouver l'indice correspondant dans la table 1
-
-    }
-
-    j = 0
-    for idx in nbr_interval:
-        if ()
-    */
-
-    return 0.005; // [0;1]
-}
-
 
 //alex: on tronque les tables lorsqu'on a les bornes mins et max comme ca on part de 0 pour les 2 on a alors juste:
 //static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2)
@@ -399,14 +330,12 @@ float8 calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1,
             i--;
             j++;
             limit = (float8) (((float8)j+1) * ratio); //on met a jour la nouvelle limite
-            printf("LIMIT: %f\n",limit);
+            // printf("LIMIT: %f\n",limit);
         }
-        printf("INDEXES: %d -- %d\n", i, j);
-        printf("VALS: %f * %f\n",freq_hist1[i],freq_hist2[j]);
+        // printf("INDEXES: %d -- %d\n", i, j);
+        // printf("VALS: %f * %f\n",freq_hist1[i],freq_hist2[j]);
         total += freq_hist1[i] * freq_hist2[j]; //add to total
     }
-
-    printf(">>>> helllo");
 
     return total; //TODO normalize result
 }
