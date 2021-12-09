@@ -57,7 +57,7 @@ function error_quit {
 }
 
 function make_pgsql {
-    ./configure --enable-cassert --enable-debug CFLAGS="-ggdb -Og -g3 -fno-omit-frame-pointer" : 'uncomment if you haver never compiled it before.'
+    # ./configure #--enable-cassert --enable-debug CFLAGS="-ggdb -Og -g3 -fno-omit-frame-pointer" : 'uncomment if you haver never compiled it before.'
     make || error_quit "make"
     sudo make install || error_quit "make install"
 }

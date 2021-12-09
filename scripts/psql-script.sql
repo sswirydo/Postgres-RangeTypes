@@ -8,8 +8,8 @@
 
 CREATE TABLE integers1(r int4range);
 CREATE TABLE integers2(r int4range);
-INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 10) AS s;
-INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 10) AS s;
+INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 1000) AS s;
+INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 1000) AS s;
 
 -- SELECT * FROM integers1;
 
@@ -32,7 +32,7 @@ INSERT INTO floats2 SELECT numrange((-s)*3.1, s*4.1) FROM generate_series(1, 10)
 SELECT * FROM floats1;
 SELECT * FROM floats2;
 
-VACUUM ANALYZE floats1;
+--VACUUM ANALYZE floats1;
 VACUUM ANALYZE floats2;
 
 EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM floats1 t1, floats2 t2 WHERE t1.r && t2.r;

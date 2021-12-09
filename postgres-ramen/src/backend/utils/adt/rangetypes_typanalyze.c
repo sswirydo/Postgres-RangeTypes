@@ -288,9 +288,15 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			lowers[non_empty_cnt] = lower;
 			uppers[non_empty_cnt] = upper;
 
+			// -------------------------- //
 			// No data for floats. Rip. :/
-			// printf("lower: %f\n", Float8GetDatum(lower.val));
-			// printf("upper: %f\n", NumericGetDatum(upper.val));
+			// printf("-VALS:\n");
+			// printf("val: %lf\n", (float) lower.val);
+			// printf("val: %lf\n", (float8) lower.val);
+			// printf("val: %lf\n", DatumGetFloat8(lower.val));
+			// printf("val: %lf\n", (float8) DatumGetFloat8(lower.val));
+			// printf("val: %lf\n", (float) DatumGetFloat8(lower.val));
+			// -------------------------- //
 
 			// -- szymon: cette partie on calcule la longueur par rapport aux lower and upper bounds -- //
 			if (lower.infinite || upper.infinite) // szymon: si range infinie, length infinie
