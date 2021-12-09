@@ -128,8 +128,19 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int* frequencies_intervals;
 	float8* normalized_frequencies_vals;
 
+	// No data for floats. Rip. :/
+	//printf("lower: %f\n", (float) (lower)->val);
+	//printf("upper: %f\n", DatumGetFloat8((upper+rows+1)->val));
+	// fflush(stdout);
+
 	min = (lowers)->val;
 	max = (uppers+rows-1)->val;
+
+	/*
+	printf("lower: %f\n", (float) min);
+	printf("upper: %d\n", max);
+	fflush(stdout);
+	*/
 
 	// -- CHOOSING THE INTERVAL LENGTH AND THE NUMBER OF INTERVALS -- //
 	length = max - min; 
@@ -189,7 +200,7 @@ count_frequencies(RangeBound* lowers, RangeBound* uppers, int* frequencies_vals,
 
 	for (i = 0; i < nb_of_intervals; ++i){
 		sup += interval_length;
-		frequencies_intervals[i] = sup;
+		frequencies_intervals[i] = sup; // fixme delete (optimizer)
 		while((int)(lowers+l)->val <= sup && l < rows){
 			count++;
 			l++;
@@ -289,8 +300,11 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			uppers[non_empty_cnt] = upper;
 
 			// No data for floats. Rip. :/
-			// printf("lower: %f\n", Float8GetDatum(lower.val));
-			// printf("upper: %f\n", NumericGetDatum(upper.val));
+			//printf("lower: %d\n", lower.val);
+
+		 	printf("lower: %f\n", (float) lower.val);
+		 	printf("upper: %f\n", DatumGetFloat8((upper.val)));
+			// fflush(stdout);
 
 			// -- szymon: cette partie on calcule la longueur par rapport aux lower and upper bounds -- //
 			if (lower.infinite || upper.infinite) // szymon: si range infinie, length infinie
@@ -483,6 +497,7 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 		stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
 
+		++slot_idx;
 		ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, num_hist); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
 		++slot_idx;
 

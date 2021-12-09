@@ -47,7 +47,6 @@ static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up
 static void _debug_print_frequencies(float8* frequencies_vals, int size);
 // ------------------------- //
 
-
 /*
  * Range Overlaps Join Selectivity.
  */
@@ -200,8 +199,8 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
 {
     float8 result = 0.005;
-    int interval_length1 = (max1 - min1) / freq_nb_intervals1;
-    int interval_length2 = (max2 - min2) / freq_nb_intervals2;
+    int interval_length1 = roundUpDivision((max1 - min1) , freq_nb_intervals1);
+    int interval_length2 = roundUpDivision((max2 - min2) , freq_nb_intervals2);
     int x_low = 0;
     int y_low = 0;
     int x_high = freq_nb_intervals1 - 1;
@@ -253,8 +252,10 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
         }
     }
 
-    if (! stop)
+    if (! stop){
         result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1);
+        result = result / (rows1*rows2);
+    }
 
     return result;
 }
