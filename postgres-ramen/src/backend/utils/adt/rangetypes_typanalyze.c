@@ -113,7 +113,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	} RangeBound;
 	*/
 
-	int PERCENT_INTERVAL_LENGTH = 5; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
+	int PERCENT_INTERVAL_LENGTH = 25; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
 	int i;
 	int j;
 	int min;
@@ -301,7 +301,6 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 			// -------------------------- //
 			// No data for floats. Rip. :/
-<<<<<<< HEAD
 			// printf("-VALS:\n");
 			// printf("val: %lf\n", (float) lower.val);
 			// printf("val: %lf\n", (float8) lower.val);
@@ -309,13 +308,6 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			// printf("val: %lf\n", (float8) DatumGetFloat8(lower.val));
 			// printf("val: %lf\n", (float) DatumGetFloat8(lower.val));
 			// -------------------------- //
-=======
-			//printf("lower: %d\n", lower.val);
-
-		 	printf("lower: %f\n", (float) lower.val);
-		 	printf("upper: %f\n", DatumGetFloat8((upper.val)));
-			// fflush(stdout);
->>>>>>> 07680cae858bb313207c1c62a46d5fbecbb671ab
 
 			// -- szymon: cette partie on calcule la longueur par rapport aux lower and upper bounds -- //
 			if (lower.infinite || upper.infinite) // szymon: si range infinie, length infinie

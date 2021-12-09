@@ -5,15 +5,11 @@
 -- '[' or ']' = born comprise
 
 -- INTEGER VALUES -
-/*
+
 CREATE TABLE integers1(r int4range);
 CREATE TABLE integers2(r int4range);
-INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 1000) AS s;
-INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 1000) AS s;
-<<<<<<< HEAD
-=======
-
->>>>>>> 07680cae858bb313207c1c62a46d5fbecbb671ab
+INSERT INTO integers1 SELECT int4range(s*3, s*9) FROM generate_series(1, 1000) AS s;
+INSERT INTO integers2 SELECT int4range((-s)*2, s*8) FROM generate_series(1, 200) AS s;
 
 -- SELECT * FROM integers1;
 
@@ -25,10 +21,10 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM integers1 t1, integers2 t2 WHERE
 
 DROP table integers1;
 DROP table integers2;
-*/
+
 
 -- FLOAT VALUES -- 
-
+/*
 CREATE TABLE floats1(r numrange);
 CREATE TABLE floats2(r numrange);
 INSERT INTO floats1 SELECT numrange(s*5.2, s*8.1) FROM generate_series(1, 10) AS s;
@@ -44,7 +40,7 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM floats1 t1, floats2 t2 WHERE t1.
 
 DROP table floats1;
 DROP table floats2;
-
+*/
 
 -- TIMESTAMP VALUES --
 
