@@ -113,7 +113,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	} RangeBound;
 	*/
 
-	int PERCENT_INTERVAL_LENGTH = 25; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
+	int PERCENT_INTERVAL_LENGTH = 5; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
 	int i;
 	int j;
 	int min;
