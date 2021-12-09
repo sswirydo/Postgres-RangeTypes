@@ -42,10 +42,11 @@
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
 static int roundUpDivision(int numerator, int divider);
 float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
-float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2);
+float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int min1, int min2);
 static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound);
 static void _debug_print_frequencies(float8* frequencies_vals, int size);
 // ------------------------- //
+
 
 /*
  * Range Overlaps Join Selectivity.
@@ -199,8 +200,11 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
 {
     float8 result = 0.005;
-    int interval_length1 = roundUpDivision((max1 - min1) , freq_nb_intervals1);
-    int interval_length2 = roundUpDivision((max2 - min2) , freq_nb_intervals2);
+    
+    int interval_length1 = roundUpDivision(max1 - min1, freq_nb_intervals1);
+    int interval_length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
+
+    
     int x_low = 0;
     int y_low = 0;
     int x_high = freq_nb_intervals1 - 1;
@@ -252,10 +256,8 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
         }
     }
 
-    if (! stop){
-        result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1);
-        result = result / (rows1*rows2);
-    }
+    if (! stop)
+        result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
 
     return result;
 }
@@ -265,41 +267,29 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
 //on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
 //sinon lorsque valeures trop différentes problème pour la limit
 //O(max(size1,size2))
-float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2){
-    float8* freq_hist1;
-    float8* freq_hist2;
-    float8 total;
-    float8 limit;
-    int max;
-    int i, j;
-    float8 ratio; //ratio du changement (par exemple size1 = 4 et size2 = 3 -> ratio = 4/3 += 1.33)
-    if(size1 >= size2){
-        freq_hist1 = trunc_freq1;
-        freq_hist2 = trunc_freq2;
-        max = size1;
-        ratio = (float8)size1/size2;
-    }
-    else{
-        freq_hist1 = trunc_freq2;
-        freq_hist2 = trunc_freq1;
-        max = size2;
-        ratio = (float8)size2/size1;
-    }
-
-    j = 0;
-    limit = (float8) ratio; //first limit is (0+1)*(ratio) donc 1.33
-    total = 0;
-    for(i = 0; i < max; ++i){
-        if((float8)i > limit){ //on a depasse la limite, il faut incrementer j et  trunc[i]*trunc[j]
-            --i;
-            ++j;
-            limit = (float8) (((float8)j+1) * ratio); //on met a jour la nouvelle limite
-            // printf("LIMIT: %f\n",limit);
-        }
-        // printf("INDEXES: %d -- %d\n", i, j);
-        // printf("VALS: %f * %f\n",freq_hist1[i],freq_hist2[j]);
-        total += (freq_hist1[i] * freq_hist2[j]); //add to total
-    }
+float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int min1, int min2){
+    int idx_1 = 0;
+    int idx_2 = 0;
+    
+    float8 total = 0;
+    
+    while(idx_1 < size1 && idx_2 < size2){
+    	total += trunc_freq1[idx_1] * trunc_freq2[idx_2];
+    	if(min1 < min2){
+    		min1 += interval_length1;
+    		idx_1++;
+    	}
+    	else if(min1 > min2){
+    		min2 += interval_length2;
+    		idx_2++;
+    	}
+    	else{
+    		min1 += interval_length1;
+    		idx_1++;
+    		min2 += interval_length2;
+    		idx_2++;
+    	}
+    } 
 
     return total; //TODO normalize result
 }
