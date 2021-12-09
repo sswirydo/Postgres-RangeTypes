@@ -127,8 +127,8 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     }
    
     //////////////////////
-	// BOUNDS HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
-	//////////////////////
+    // BOUNDS HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
+    //////////////////////
 
     RangeBound r_min1, r_min2, r_max1, r_max2;
     int min1, min2, max1, max2;
@@ -151,8 +151,8 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     max2 = r_max2.val;
 
     /////////////////////////
-	// FREQUENCY HISTOGRAM //
-	/////////////////////////
+    // FREQUENCY HISTOGRAM //
+    /////////////////////////
 
     // -- Retriving the sizes of each histogram. i.e. the number of intervals. -- //
     freq_nb_intervals1 = freq_sslot1.nvalues;
@@ -173,8 +173,8 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     // _debug_print_frequencies(freq_values2, freq_nb_intervals2);
 
     ///////////////////////////////////////
-	// OVERLAP JOIN SELECTIVY ESTIMATION //
-	///////////////////////////////////////
+    // OVERLAP JOIN SELECTIVY ESTIMATION //
+    ///////////////////////////////////////
 
     if (IsInRange(min1, max1, min2, max2)){
         selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2, min1, min2, max1, max2);
@@ -203,7 +203,6 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
     
     int interval_length1 = roundUpDivision(max1 - min1, freq_nb_intervals1);
     int interval_length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
-
     
     int x_low = 0;
     int y_low = 0;
@@ -256,8 +255,10 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
         }
     }
 
-    if (! stop)
+    if (! stop){
         result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
+        result = result / (rows1*rows2);
+    }
 
     return result;
 }
