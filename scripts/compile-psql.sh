@@ -2,12 +2,6 @@
 
 :'  Expected format:
     sudo ./compile-pgsql.sh full_path_sql_script ramen_sql_root_path [official_sql_root_path] 
-    
-    alex: sudo /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/compile-psql.sh /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/psql-script.sql /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/postgres-ramen 
-    aure: 
-    nico: 
-    szymon: sudo /media/sf_Postgres-RangeTypes/scripts/compile-psql.sh /media/sf_Postgres-RangeTypes/scripts/psql-script.sql /media/sf_Postgres-RangeTypes/postgres-ramen/
-
 '
 
 
@@ -23,8 +17,8 @@ function main {
         make_pgsql || error_quit "make"
         run_pgsql || error_quit "run"
 
-        sudo rm ${RAMEN_PATH}/ramendata/sushiOUT.txt || echo "rip sushi rm"
-        sudo cp /usr/local/pgsql/data/sushiOUT.txt ${RAMEN_PATH}/ramendata/ || echo "rip sushi cp"
+        # sudo rm ${RAMEN_PATH}/ramendata/sushiOUT.txt || echo "rip sushi rm"
+        # sudo cp /usr/local/pgsql/data/sushiOUT.txt ${RAMEN_PATH}/ramendata/ || echo "rip sushi cp"
 
         cd "${current_path}"
     fi

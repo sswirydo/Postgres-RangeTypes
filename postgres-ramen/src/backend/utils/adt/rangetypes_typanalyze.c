@@ -103,6 +103,16 @@ range_bound_qsort_cmp(const void *a1, const void *a2, void *arg)
 static void
 ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows)
 {
+	/*
+	typedef struct
+	{
+		Datum		val;			// the bound value, if any
+		bool		infinite;		// bound is +/- infinity
+		bool		inclusive;		// bound is inclusive (vs exclusive)
+		bool		lower;			// this is the lower (vs upper) bound
+	} RangeBound;
+	*/
+
 	int PERCENT_INTERVAL_LENGTH = 5; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
 	int i;
 	int j;
@@ -117,8 +127,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int* frequencies_vals;
 	int* frequencies_intervals;
 	float8* normalized_frequencies_vals;
-	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
-	
+
 	min = (lowers)->val;
 	max = (uppers+rows-1)->val;
 
@@ -279,6 +288,9 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			lowers[non_empty_cnt] = lower;
 			uppers[non_empty_cnt] = upper;
 
+			// No data for floats. Rip. :/
+			// printf("lower: %f\n", Float8GetDatum(lower.val));
+			// printf("upper: %f\n", NumericGetDatum(upper.val));
 
 			// -- szymon: cette partie on calcule la longueur par rapport aux lower and upper bounds -- //
 			if (lower.infinite || upper.infinite) // szymon: si range infinie, length infinie

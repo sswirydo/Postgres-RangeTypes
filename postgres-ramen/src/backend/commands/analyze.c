@@ -552,7 +552,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 			stats->rows = rows;
 			stats->tupDesc = onerel->rd_att;
 
-			FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "compute_stats(...) call"); fclose(file);
 			stats->compute_stats(stats,
 								 std_fetch_func,
 								 numrows,
@@ -576,7 +575,6 @@ do_analyze_rel(Relation onerel, VacuumParams *params,
 		}
 
 		if (hasindex){
-			FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "compute_index_stats(...) call"); fclose(file);
 			compute_index_stats(onerel, totalrows,
 								indexdata, nindexes,
 								rows, numrows,
@@ -742,7 +740,6 @@ compute_index_stats(Relation onerel, double totalrows,
 					HeapTuple *rows, int numrows,
 					MemoryContext col_context)
 {
-	printf("\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "");
 
 	MemoryContext ind_context,
 				old_context;
