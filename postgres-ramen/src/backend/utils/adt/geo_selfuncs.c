@@ -41,8 +41,8 @@
 // -- H-417 OUR FUNCTIONS -- //
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
 static int roundUpDivision(int numerator, int divider);
-float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
-float8 calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2);
+float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
+float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2);
 static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound);
 static void _debug_print_frequencies(float8* frequencies_vals, int size);
 // ------------------------- //
@@ -116,15 +116,20 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
                              InvalidOid, ATTSTATSSLOT_VALUES))))
         {
             ReleaseVariableStats(vardata1); ReleaseVariableStats(vardata2);
-            pfree(&sslot1); pfree(&sslot2); pfree(&freq_sslot1);pfree(&freq_sslot2);
+            free_attstatsslot(&sslot1); free_attstatsslot(&sslot2); free_attstatsslot(&freq_sslot1); free_attstatsslot(&freq_sslot2);
             PG_RETURN_FLOAT8(selec);
         }
+    }
+    else {
+        ReleaseVariableStats(vardata1); ReleaseVariableStats(vardata2);
+        free_attstatsslot(&sslot1); free_attstatsslot(&sslot2); free_attstatsslot(&freq_sslot1); free_attstatsslot(&freq_sslot2);
+        PG_RETURN_FLOAT8(selec);
     }
    
     //////////////////////
 	// BOUNDS HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
 	//////////////////////
-    
+
     RangeBound r_min1, r_min2, r_max1, r_max2;
     int min1, min2, max1, max2;
     RangeBound buffer;
@@ -172,7 +177,7 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 	///////////////////////////////////////
 
     if (IsInRange(min1, max1, min2, max2)){
-        selec = nameTBD(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2, min1, min2, max1, max2);
+        selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2, min1, min2, max1, max2);
     }
 
     // -- FREE -- //
@@ -192,48 +197,35 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     PG_RETURN_FLOAT8(selec);
 }
 
-float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
+float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2)
 {
-    Selectivity result = 0.005;
+    float8 result = 0.005;
     int interval_length1 = (max1 - min1) / freq_nb_intervals1;
     int interval_length2 = (max2 - min2) / freq_nb_intervals2;
-
-    int x_low, y_low;
-    int x_high, y_high;
-
+    int x_low = 0;
+    int y_low = 0;
+    int x_high = freq_nb_intervals1 - 1;
+    int y_high = freq_nb_intervals2 - 1;
     int min_val1 = min1;
     int min_val2 = min2;
-
     int max_val1 = max1;
     int max_val2 = max2;
-
-    int in_range;
     int stop = 0;
-
-    bool overlap = IsInRange(min1, max1, min2, max2);
-
-    x_low = 0;
-    y_low = 0;
-    x_high = freq_nb_intervals1 - 1;
-    y_high = freq_nb_intervals2 - 1;
+    int i = 0;
+    int new_size1;
+    int new_size2;
 
     // -- LOW -- //
-    in_range = IsInRange(min_val1, min_val1 + interval_length1, min_val2, min_val2 + interval_length2);
-    while (! in_range) {
+    while (! IsInRange(min_val1, min_val1 + interval_length1, min_val2, min_val2 + interval_length2)) {
         if (min_val1 < min_val2){
-            if (! in_range){
-                min_val1 += interval_length1;
-                ++x_low;
-            }
+            min_val1 += interval_length1;
+            ++x_low;
         }
         else if (min_val2 < min_val1){
-            if (! in_range){
-                min_val2 += interval_length2;
-                ++y_low;
-            }
+            min_val2 += interval_length2;
+            ++y_low;
         }
         else {printf("???"); ++x_low;  ++y_low;}
-        in_range = IsInRange(min_val1, min_val1 + interval_length1, min_val2, min_val2 + interval_length2);
 
         if (x_low == freq_nb_intervals1 | y_low == freq_nb_intervals2) {
             printf(">>> STOP LOW.\n");
@@ -243,22 +235,16 @@ float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals
     }
     
     // -- HIGH -- //
-    in_range = IsInRange(max_val1 - interval_length1, max_val1, max_val2 - interval_length2, max_val2);
-    while (! in_range) {
+    while (! IsInRange(max_val1 - interval_length1, max_val1, max_val2 - interval_length2, max_val2)) {
         if (max_val1 > max_val2){
-            if (! in_range){
-                max_val1 -= interval_length1;
-                --x_high;
-            }
+            max_val1 -= interval_length1;
+            --x_high;
         }
         else if (max_val2 > max_val1){
-            if (! in_range){
-                max_val2 -= interval_length2;
-                --y_high;
-            }
+            max_val2 -= interval_length2;
+            --y_high;
         }
         else {printf("???"); --x_high; --y_high;}
-        in_range = IsInRange(max_val1 - interval_length1, max_val1, max_val2 - interval_length2, max_val2);
 
         if (x_high == 0 | y_high == 0) {
             printf(">>> STOP HIGH.\n");
@@ -267,32 +253,9 @@ float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals
         }
     }
 
-    if (! stop) {
-        int i;
-        int new_size1 = (x_high - x_low) + 1;
-        int new_size2 = (y_high - y_low) + 1;
-        float8* trunc_freq1 = (float8*) palloc(sizeof(float8) * new_size1);
-        float8* trunc_freq2 = (float8*) palloc(sizeof(float8) * new_size2);
+    if (! stop)
+        result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1);
 
-        for (i = x_low; i <= x_high; ++i){
-            trunc_freq1[i - x_low] = freq_values1[i];
-        }
-        for (i = y_low; i <= y_high; ++i){
-            trunc_freq2[i - y_low] = freq_values2[i];
-        }
-
-        // -- DEBUG -- //
-        // _debug_print_frequencies(trunc_freq1, new_size1);
-        // _debug_print_frequencies(trunc_freq2, new_size2);
-        // printf(">>>>>DEBUG:\n");
-        // printf("---vals1: %d %d, %d %d\n", x_low, x_high, y_low, y_high);  
-        // printf("---vals2: %d, %d\n", new_size1, new_size2);
-
-        result = calculateSelectivity(trunc_freq1, trunc_freq2, new_size1, new_size2);
-
-        pfree(trunc_freq1);
-        pfree(trunc_freq2);
-    }
     return result;
 }
 
@@ -301,7 +264,7 @@ float8 nameTBD(float8* freq_values1, float8* freq_values2, int freq_nb_intervals
 //on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
 //sinon lorsque valeures trop différentes problème pour la limit
 //O(max(size1,size2))
-float8 calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2){
+float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2){
     float8* freq_hist1;
     float8* freq_hist2;
     float8 total;
@@ -313,28 +276,28 @@ float8 calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1,
         freq_hist1 = trunc_freq1;
         freq_hist2 = trunc_freq2;
         max = size1;
-        ratio = (float)size1/size2;
+        ratio = (float8)size1/size2;
     }
     else{
         freq_hist1 = trunc_freq2;
         freq_hist2 = trunc_freq1;
         max = size2;
-        ratio = (float)size2/size1;
+        ratio = (float8)size2/size1;
     }
 
     j = 0;
     limit = (float8) ratio; //first limit is (0+1)*(ratio) donc 1.33
     total = 0;
-    for(i = 0; i < max; i ++){
+    for(i = 0; i < max; ++i){
         if((float8)i > limit){ //on a depasse la limite, il faut incrementer j et  trunc[i]*trunc[j]
-            i--;
-            j++;
+            --i;
+            ++j;
             limit = (float8) (((float8)j+1) * ratio); //on met a jour la nouvelle limite
             // printf("LIMIT: %f\n",limit);
         }
         // printf("INDEXES: %d -- %d\n", i, j);
         // printf("VALS: %f * %f\n",freq_hist1[i],freq_hist2[j]);
-        total += freq_hist1[i] * freq_hist2[j]; //add to total
+        total += (freq_hist1[i] * freq_hist2[j]); //add to total
     }
 
     return total; //TODO normalize result

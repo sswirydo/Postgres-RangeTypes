@@ -7,15 +7,15 @@
 -- INTEGER VALUES --
 CREATE TABLE integers1(r int4range);
 CREATE TABLE integers2(r int4range);
-INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 10000) AS s;
-INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 10000) AS s;
+INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 10) AS s;
+INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 10) AS s;
 --INSERT INTO integers1 SELECT int4range(s*5, s*8) FROM generate_series(1, 10) AS s;
 --INSERT INTO integers2 SELECT int4range((-s)*3, s*4) FROM generate_series(1, 10) AS s;
 
 -- SELECT * FROM integers1;
 
-VACUUM ANALYZE integers1;
-VACUUM ANALYZE integers2;
+--VACUUM ANALYZE integers1;
+--VACUUM ANALYZE integers2;
 
 EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM integers1 t1, integers2 t2 WHERE t1.r && t2.r;
 
@@ -26,8 +26,8 @@ DROP table integers2;
 /*
 CREATE TABLE floats1(r numrange);
 CREATE TABLE floats2(r numrange);
-INSERT INTO floats1 SELECT floats1(s*5.2, s*8.1) FROM generate_series(0, 10) AS s;
-INSERT INTO floats2 SELECT numrange((-s)*3.1, s*4.1) FROM generate_series(0, 10) AS s;
+INSERT INTO floats1 SELECT floats1(s*5.2, s*8.1) FROM generate_series(1, 10) AS s;
+INSERT INTO floats2 SELECT numrange((-s)*3.1, s*4.1) FROM generate_series(1, 10) AS s;
 
 VACUUM ANALYZE floats1;
 VACUUM ANALYZE floats2;

@@ -49,9 +49,6 @@ static void compute_range_stats(VacAttrStats *stats,
 Datum
 range_typanalyze(PG_FUNCTION_ARGS)
 {
-	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "1"); fclose(file);
-	file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, "2"); fclose(file);
-
 	VacAttrStats *stats = (VacAttrStats *) PG_GETARG_POINTER(0);
 	TypeCacheEntry *typcache;
 	Form_pg_attribute attr = stats->attr;
@@ -221,8 +218,6 @@ static void
 compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 					int samplerows)
 {
-	FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
-
 	TypeCacheEntry *typcache = (TypeCacheEntry *) stats->extra_data;
 	bool		has_subdiff = OidIsValid(typcache->rng_subdiff_finfo.fn_oid);
 	int			null_cnt = 0;
