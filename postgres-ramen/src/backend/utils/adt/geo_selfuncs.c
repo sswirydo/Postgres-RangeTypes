@@ -76,7 +76,7 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     int         freq_nb_intervals1, freq_nb_intervals2;
     float8*        freq_values1 = NULL;
     float8*        freq_values2 = NULL;
-    float8 selec = 0.005;
+    float8 selec = 0.005; // Default selectivty in case something goes wrong.
 
     ///////////
 	// INITs //
@@ -86,6 +86,11 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     get_join_variables(root, args, sjinfo, &vardata1, &vardata2, &join_is_reversed);
     typcache = range_get_typcache(fcinfo, vardata1.vartype);
     opfuncoid = get_opcode(operator);
+
+    // -- Quick operator check. -- //
+    if (operator != OID_RANGE_OVERLAP_OP){
+        PG_RETURN_FLOAT8(selec);
+    }
 
     // -- Allocating memory for AttStatsSlot (stores our statistics) -- //
     memset(&sslot1, 0, sizeof(sslot1));

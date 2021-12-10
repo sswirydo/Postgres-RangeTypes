@@ -102,6 +102,50 @@ default_range_selectivity(Oid operator)
 	}
 }
 
+
+/*
+ * rangeoverlapsrestsel -- restriction selectivity overlap range operator (OID_RANGE_OVERLAP_OP)
+ */
+Datum
+rangeoverlapsrestsel(PG_FUNCTION_ARGS)
+{	
+	/*
+		DISCLAIMER
+			AS EXPLAINED MORE IN DEPTH IN THE REPORT,
+			WE WILL FOCUS OUR IMPLEMENTATION ON THE
+			rangestrictleftrestsel FUNCTION BELOW.
+		(this one simply calls the default rangesel() function)
+	*/
+	printf("Hello World OID_RANGE_OVERLAP_OP\n");
+	fflush(stdout);
+	// PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_OVERLAP_OP));
+	return rangesel(fcinfo);
+}
+
+/*
+ * rangestrictleftrestsel -- restriction selectivity for strictly left range operator (OID_RANGE_LEFT_OP)
+ */
+Datum
+rangestrictleftrestsel(PG_FUNCTION_ARGS)
+{
+	printf("Hello World OID_RANGE_LEFT_OP\n");
+	fflush(stdout);
+	// PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_LEFT_OP));
+
+
+	// --- TODO --- //
+
+
+
+	// --- TODO --- //
+
+	return rangesel(fcinfo);
+}
+
+
+
+
+
 /*
  * rangesel -- restriction selectivity for range operators
  */
