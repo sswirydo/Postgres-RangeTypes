@@ -132,13 +132,126 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
 	fflush(stdout);
 	// PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_LEFT_OP));
 
+	// //init
+	// PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
+	// Oid			operator = PG_GETARG_OID(1);
+	// List	   *args = (List *) PG_GETARG_POINTER(2);
+	// int			varRelid = PG_GETARG_INT32(3);
+	// VariableStatData vardata;
+	// Node	   *other;
+	// bool		varonleft;
+	// Selectivity selec;
+	// TypeCacheEntry *typcache = NULL;
+	// RangeType  *constERROR:  syntax error at or near "#!/"LINE 1: #!/bin/bashrange = NULL;
 
-	// --- TODO --- //
+	// //check si cste
+	// if (!get_restriction_variable(root, args, varRelid,
+	// 							  &vardata, &other, &varonleft)) // szymon: ici on rempli vardata (table) et other (cste)
+	// 	PG_RETURN_FLOAT8(default_range_selectivity(operator));
+
+	// //on quitte si c'est dla merde
+	// if (!IsA(other, Const))
+	// {
+	// 	ReleaseVariableStats(vardata);
+	// 	PG_RETURN_FLOAT8(default_range_selectivity(operator));
+	// }
+
+	// //jsp ce que c'est mais jcrois faut lmettre 
+	// if (((Const *) other)->constisnull)
+	// {
+	// 	ReleaseVariableStats(vardata);
+	// 	PG_RETURN_FLOAT8(0.0);
+	// }
+
+	// // szymon: on gros comme on travaille avec table + cst, ils inversent justent leur position
+	// if (!varonleft)
+	// {
+	// 	/* we have other Op var, commute to make var Op other */
+	// 	operator = get_commutator(operator);
+	// 	if (!operator)
+	// 	{
+	// 		/* Use default selectivity (should we raise an error instead?) */
+	// 		ReleaseVariableStats(vardata);
+	// 		PG_RETURN_FLOAT8(default_range_selectivity(operator));
+	// 	}
+	// }
+
+	// //
+	// if (operator == OID_RANGE_CONTAINS_ELEM_OP)
+	// {
+	// 	typcache = range_get_typcache(fcinfo, vardata.vartype);
+
+	// 	if (((Const *) other)->consttype == typcache->rngelemtype->type_id)
+	// 	{
+	// 		RangeBound	lower,
+	// 					upper;
+
+	// 		lower.inclusive = true;
+	// 		lower.val = ((Const *) other)->constvalue;
+	// 		lower.infinite = false;
+	// 		lower.lower = true;
+	// 		upper.inclusive = true;
+	// 		upper.val = ((Const *) other)->constvalue;
+	// 		upper.infinite = false;
+	// 		upper.lower = false;
+	// 		constrange = range_serialize(typcache, &lower, &upper, false);
+	// 	}
+	// }
+
+
+	// //idk
+	// if (operator == OID_RANGE_CONTAINS_ELEM_OP)
+	// {
+	// 	typcache = range_get_typcache(fcinfo, vardata.vartype);
+
+	// 	if (((Const *) other)->consttype == typcache->rngelemtype->type_id)
+	// 	{
+	// 		RangeBound	lower,
+	// 					upper;
+
+	// 		lower.inclusive = true;
+	// 		lower.val = ((Const *) other)->constvalue;
+	// 		lower.infinite = false;
+	// 		lower.lower = true;
+	// 		upper.inclusive = true;
+	// 		upper.val = ((Const *) other)->constvalue;
+	// 		upper.infinite = false;
+	// 		upper.lower = false;
+	// 		constrange = range_serialize(typcache, &lower, &upper, false);
+	// 	}
+	// }
+    // // -- Allocating memory for AttStatsSlot (stores our statistics) -- //
+    // memset(&sslot1, 0, sizeof(sslot1));
+    // memset(&sslot2, 0, sizeof(sslot2));
+    // memset(&freq_sslot1, 0, sizeof(freq_sslot1));
+    // memset(&freq_sslot2, 0, sizeof(freq_sslot2));
 
 
 
-	// --- TODO --- //
 
+
+    // // -- RETRIVING HISTOGGRAMS -- //
+    // if (HeapTupleIsValid(vardata1.statsTuple) && HeapTupleIsValid(vardata2.statsTuple))
+    // {
+    //     if (! ((get_attstatsslot(&sslot1, vardata1.statsTuple,
+    //                                     STATISTIC_KIND_BOUNDS_HISTOGRAM,
+    //                                     InvalidOid, ATTSTATSSLOT_VALUES)) 
+    //         && (get_attstatsslot(&sslot2, vardata2.statsTuple,
+    //                                     STATISTIC_KIND_BOUNDS_HISTOGRAM,
+    //                                     InvalidOid, ATTSTATSSLOT_VALUES))
+    //         && (get_attstatsslot(&freq_sslot1, vardata1.statsTuple,
+    //                          STATISTIC_KIND_FREQUENCY_HISTOGRAM,
+    //                          InvalidOid, ATTSTATSSLOT_VALUES))
+    //         && (get_attstatsslot(&freq_sslot2, vardata2.statsTuple,
+    //                          STATISTIC_KIND_FREQUENCY_HISTOGRAM,
+    //                          InvalidOid, ATTSTATSSLOT_VALUES))))
+    //     {
+    //         ReleaseVariableStats(vardata1); ReleaseVariableStats(vardata2);
+    //         free_attstatsslot(&sslot1); free_attstatsslot(&sslot2); free_attstatsslot(&freq_sslot1); free_attstatsslot(&freq_sslot2);
+    //         PG_RETURN_FLOAT8(selec);
+    //     }
+    // }
+	
 	return rangesel(fcinfo);
 }
 
