@@ -42,7 +42,7 @@
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS);
 static int roundUpDivision(int numerator, int divider);
 float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, int freq_nb_intervals1, int freq_nb_intervals2, int rows1, int rows2, int min1, int min2, int max1, int max2);
-float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int min1, int min2);
+float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int max1, int max2);
 static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound);
 static void _debug_print_frequencies(float8* frequencies_vals, int size);
 // ------------------------- //
@@ -54,7 +54,7 @@ static void _debug_print_frequencies(float8* frequencies_vals, int size);
 Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 {
 	// FILE* file = fopen("sushiOUT.txt","a"); fprintf(file, "\nFile: %s Line: %d Fct: %s Info: %s",__FILE__, __LINE__, __func__, ""); fclose(file);
-    
+
     PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
     Oid         operator = PG_GETARG_OID(1);
     List       *args = (List *) PG_GETARG_POINTER(2);
@@ -180,7 +180,7 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     ///////////////////////////////////////
     // OVERLAP JOIN SELECTIVY ESTIMATION //
     ///////////////////////////////////////
-
+    
     if (IsInRange(min1, max1, min2, max2)){
         selec = rangeoverlapsjoinsel_inner(freq_values1, freq_values2, freq_nb_intervals1, freq_nb_intervals2, nhist1, nhist2, min1, min2, max1, max2);
     }
@@ -206,8 +206,8 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
 {
     float8 result = 0.005;
     
-    int interval_length1 = roundUpDivision(max1 - min1, freq_nb_intervals1);
-    int interval_length2 = roundUpDivision(max2 - min2, freq_nb_intervals2);
+    int interval_length1 = roundUpDivision(max1 - min1 + 1, freq_nb_intervals1);
+    int interval_length2 = roundUpDivision(max2 - min2 + 1, freq_nb_intervals2);
     
     int x_low = 0;
     int y_low = 0;
@@ -261,10 +261,12 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
     }
 
     if (! stop){
-        result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
+        result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1+interval_length1, min_val2+interval_length2);
+        printf("\nRESULT rows (sample) : %f", result);  // DEBUG
         result = result / (rows1*rows2);
+        printf("\nRESULT percentage : %f", result);  // DEBUG
     }
-
+    fflush(stdout);  // DEBUG
     return result;
 }
 
@@ -273,31 +275,34 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
 //on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
 //sinon lorsque valeures trop différentes problème pour la limit
 //O(max(size1,size2))
-float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int min1, int min2){
+float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int max1, int max2){
     int idx_1 = 0;
     int idx_2 = 0;
     
     float8 total = 0;
-    
+    //printf("\ninter : %d-%d", interval_length1, interval_length2);  // DEBUG
+    //printf("\nsize : %d-%d", size1, size2);  // DEBUG
     while(idx_1 < size1 && idx_2 < size2){
     	total += trunc_freq1[idx_1] * trunc_freq2[idx_2];
-    	if(min1 < min2){
-    		min1 += interval_length1;
+    	//printf("\nsup1 : %d & sup2: %d", max1, max2);  // DEBUG
+    	//printf("\ntotal : %f += %f * %f             :: %d-%d", total, trunc_freq1[idx_1], trunc_freq2[idx_2], idx_1, idx_2);  // DEBUG
+    	if(max1 < max2){
+    		max1 += interval_length1;
     		idx_1++;
     	}
-    	else if(min1 > min2){
-    		min2 += interval_length2;
+    	else if(max2 < max1){
+    		max2 += interval_length2;
     		idx_2++;
     	}
     	else{
-    		min1 += interval_length1;
+    		max1 += interval_length1;
     		idx_1++;
-    		min2 += interval_length2;
+    		max2 += interval_length2;
     		idx_2++;
     	}
     } 
-
-    return total; //TODO normalize result
+    //fflush(stdout);  // DEBUG
+    return total;
 }
 
 static int roundUpDivision(int numerator, int divider){
