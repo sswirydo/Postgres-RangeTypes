@@ -32,7 +32,7 @@
 
 
 // -- H-417 OUR FUNCTIONS -- //
-float8 rangestrictleftrestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper);
+float8 rangerestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper, Oid operator);
 static int roundUpDivision(int numerator, int divider);
 static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound);
 // ------------------------- //
@@ -68,73 +68,12 @@ static double calc_hist_selectivity_contains(TypeCacheEntry *typcache,
 											 const RangeBound *hist_lower, int hist_nvalues,
 											 Datum *length_hist_values, int length_hist_nvalues);
 
-/*
- * Returns a default selectivity estimate for given operator, when we don't
- * have statistics or cannot use them for some reason.
- */
-static double
-default_range_selectivity(Oid operator)
-{
-	switch (operator)
-	{
-		case OID_RANGE_OVERLAP_OP:
-			return 0.01;
-
-		case OID_RANGE_CONTAINS_OP:
-		case OID_RANGE_CONTAINED_OP:
-			return 0.005;
-
-		case OID_RANGE_CONTAINS_ELEM_OP:
-		case OID_RANGE_ELEM_CONTAINED_OP:
-
-			/*
-			 * "range @> elem" is more or less identical to a scalar
-			 * inequality "A >= b AND A <= c".
-			 */
-			return DEFAULT_RANGE_INEQ_SEL;
-
-		case OID_RANGE_LESS_OP:
-		case OID_RANGE_LESS_EQUAL_OP:
-		case OID_RANGE_GREATER_OP:
-		case OID_RANGE_GREATER_EQUAL_OP:
-		case OID_RANGE_LEFT_OP:
-		case OID_RANGE_RIGHT_OP:
-		case OID_RANGE_OVERLAPS_LEFT_OP:
-		case OID_RANGE_OVERLAPS_RIGHT_OP:
-			/* these are similar to regular scalar inequalities */
-			return DEFAULT_INEQ_SEL;
-
-		default:
-			/* all range operators should be handled above, but just in case */
-			return 0.01;
-	}
-}
-
 
 /*
- * rangeoverlapsrestsel -- restriction selectivity overlap range operator (OID_RANGE_OVERLAP_OP)
+ * rangerestsel -- restriction selectivity for strictly left range operator (OID_RANGE_LEFT_OP) and verlap range operator (OID_RANGE_OVERLAP_OP)
  */
 Datum
-rangeoverlapsrestsel(PG_FUNCTION_ARGS)
-{	
-	/*
-		DISCLAIMER
-			AS EXPLAINED MORE IN DEPTH IN THE REPORT,
-			WE WILL FOCUS OUR IMPLEMENTATION ON THE
-			rangestrictleftrestsel FUNCTION BELOW.
-		(this one simply calls the default rangesel() function)
-	*/
-	// printf("Hello World OID_RANGE_OVERLAP_OP\n");
-	// fflush(stdout);
-	// PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_OVERLAP_OP));
-	return rangesel(fcinfo);
-}
-
-/*
- * rangestrictleftrestsel -- restriction selectivity for strictly left range operator (OID_RANGE_LEFT_OP)
- */
-Datum
-rangestrictleftrestsel(PG_FUNCTION_ARGS)
+rangerestsel(PG_FUNCTION_ARGS)
 {	
 	// ███████████████████████████████
 	//        ▀█▄▀▄▀████▀  ▀█▄▀▄▀████▀
@@ -169,9 +108,8 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
 	RangeBound    const_lower;
     RangeBound    const_upper;
 
-
     // -- Quick operator check. -- // 
-	if (operator != OID_RANGE_LEFT_OP){
+	if (operator != OID_RANGE_LEFT_OP && operator != OID_RANGE_OVERLAP_OP){
         PG_RETURN_FLOAT8(selec);
     }
 
@@ -181,7 +119,6 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
 
     typcache = range_get_typcache(fcinfo, vardata1.vartype);
     opfuncoid = get_opcode(operator);
-
 
 	// Differet possible problems + the case where the const is on the left.
 	if (!IsA(other, Const) || (((Const *) other)->constisnull) || !varonleft)
@@ -237,7 +174,7 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
     }
 
     ////////////////////////////////////
-    // BOUNDS AND FREQUENCY HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
+    // BOUNDS AND FREQUENCY HISTOGRAM //
     ////////////////////////////////////
     RangeBound r_min1, r_max1;
     int min1, max1;
@@ -267,7 +204,7 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
 	range_deserialize(typcache, constrange, &const_lower, &const_upper, &empty);
 	Assert(! empty);
 
-	selec = rangestrictleftrestsel_inner(freq_values1, freq_nb_intervals1, nhist1, min1, max1, const_lower, const_upper);
+	selec = rangerestsel_inner(freq_values1, freq_nb_intervals1, nhist1, min1, max1, const_lower, const_upper, operator);
 
     // -- FREE -- //
     ReleaseVariableStats(vardata1);
@@ -295,29 +232,99 @@ static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up
 	return ! (challenge_up < low_bound || challenge_low > up_bound);
 }
 
-float8 rangestrictleftrestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper)
+float8 rangerestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper, Oid operator)
 {
-	float8 selec = 0.005;
+	float8 selec;
 	int interval_length = roundUpDivision(max1 - min1, freq_nb_intervals1);
 	int i;
 	int x, y;
 	int a = const_lower.val;
 	int b = const_upper.val;
 	float8 sum = 0;
+	int out;
 
-	for (i = 0; i < freq_nb_intervals1; ++i){
-		x = min1 + i * interval_length;
-		y = min1 + (i+1) * interval_length;
+	switch (operator)
+	{
+		case OID_RANGE_LEFT_OP:
+			for (i = 0; i < freq_nb_intervals1; ++i){
+				x = min1 + i * interval_length;
+				y = min1 + (i+1) * interval_length;
 
-		if (IsInRange(x, y, a, b))
+				if (IsInRange(x, y, a, b))
+					break;
+				else
+					sum += *(freq_values1+i);
+			}
 			break;
-		else
-			sum += *(freq_values1+i);
+		case OID_RANGE_OVERLAP_OP:
+			out = 0;
+			for (i = 0; i < freq_nb_intervals1; ++i){
+				x = min1 + i * interval_length;
+				y = min1 + (i+1) * interval_length;
+
+				if (IsInRange(x, y, a, b)) {
+					sum += *(freq_values1+i);
+					++out;
+				}
+				else if (out) // we have finished overlapping with the constant
+					break;	
+			}
+			break;
+		default:
+			selec = 0.005;
+			break;
 	}
+
 	selec = sum / (rows1);
 
 	return selec;
 }
+
+
+
+
+/*
+ * Returns a default selectivity estimate for given operator, when we don't
+ * have statistics or cannot use them for some reason.
+ */
+static double
+default_range_selectivity(Oid operator)
+{
+	switch (operator)
+	{
+		case OID_RANGE_OVERLAP_OP:
+			return 0.01;
+
+		case OID_RANGE_CONTAINS_OP:
+		case OID_RANGE_CONTAINED_OP:
+			return 0.005;
+
+		case OID_RANGE_CONTAINS_ELEM_OP:
+		case OID_RANGE_ELEM_CONTAINED_OP:
+
+			/*
+			 * "range @> elem" is more or less identical to a scalar
+			 * inequality "A >= b AND A <= c".
+			 */
+			return DEFAULT_RANGE_INEQ_SEL;
+
+		case OID_RANGE_LESS_OP:
+		case OID_RANGE_LESS_EQUAL_OP:
+		case OID_RANGE_GREATER_OP:
+		case OID_RANGE_GREATER_EQUAL_OP:
+		case OID_RANGE_LEFT_OP:
+		case OID_RANGE_RIGHT_OP:
+		case OID_RANGE_OVERLAPS_LEFT_OP:
+		case OID_RANGE_OVERLAPS_RIGHT_OP:
+			/* these are similar to regular scalar inequalities */
+			return DEFAULT_INEQ_SEL;
+
+		default:
+			/* all range operators should be handled above, but just in case */
+			return 0.01;
+	}
+}
+
 
 
 

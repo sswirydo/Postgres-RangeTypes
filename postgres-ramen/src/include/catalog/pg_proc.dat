@@ -10943,13 +10943,10 @@
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'rangeoverlapsjoinsel' },
 
-{ oid => '10001', descr => 'restriction selectivity for overlap operator',
-  proname => 'rangeoverlapsrestsel', provolatile => 's', prorettype => 'float8',
+{ oid => '10001', descr => 'restriction selectivity for overlap and strictly left of operators',
+  proname => 'rangerestsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
-  prosrc => 'rangeoverlapsrestsel' },
+  prosrc => 'rangerestsel' },
 
-{ oid => '10002', descr => 'restriction selectivity for strictly left operator',
-  proname => 'rangestrictleftrestsel', provolatile => 's', prorettype => 'float8',
-  proargtypes => 'internal oid internal int4', prosrc => 'rangestrictleftrestsel' },
 
 ]
