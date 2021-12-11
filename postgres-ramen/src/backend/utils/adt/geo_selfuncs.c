@@ -197,8 +197,6 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
 
     CLAMP_PROBABILITY(selec);
 
-    fflush(stdout);
-
     PG_RETURN_FLOAT8(selec);
 }
 
@@ -266,6 +264,8 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
         result = result / (rows1*rows2);
         printf("\nRESULT percentage : %f", result);  // DEBUG
     }
+    if (result > 1)
+    	result = 1.00;
     fflush(stdout);  // DEBUG
     return result;
 }

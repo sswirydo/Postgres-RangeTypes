@@ -33,7 +33,7 @@
 
 // -- H-417 OUR FUNCTIONS -- //
 static void ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows);
-static void count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_frequencies_vals, int* frequencies_intervals, int nb_of_intervals, int rows, int interval_length, int min);
+static void count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_frequencies_vals, int nb_of_intervals, int rows, int interval_length, int min);
 static int roundUpDivision(int numerator, int divider);
 // ------------------------ //
 
@@ -123,9 +123,8 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	} RangeBound;
 	*/
 
-	float PERCENT_INTERVAL_LENGTH = 0.3; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
-	printf("\n ROWS %d", rows);
-	fflush(stdout);
+	int WEIGHT = 25; //FIXME ARBITRARY VALUE
+
 	int i;
 	int j;
 	int min;
@@ -136,7 +135,6 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int nb_of_intervals;
 
 	float8* normalized_frequencies_vals;
-	int* frequencies_intervals;
 
 	// No data for floats. Rip. :/
 	//printf("lower: %f\n", (float) (lower)->val);
@@ -146,57 +144,35 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	min = (lowers)->val;
 	max = (uppers+rows-1)->val;
 	
-	// BEGIN TODO EN CONSTRUCTION
-	// DEBUG begin
-	int sl = 0;
+	// BEGIN TODO EXPERIMENTAL
+	int sum_length = 0;
 	for (i=0; i < rows; i++){
-		sl += (uppers+i)->val - (lowers+i)->val;
+		sum_length += (uppers+i)->val - (lowers+i)->val;
 	}
-	
 	float average;
-	average = sl / rows;
+	average = sum_length / rows;
 	printf("\n\n AVERAGE : %f", average);
 	printf("\nMIN: %d", min);
 	printf("\nMAX: %d\n", max);
-	PERCENT_INTERVAL_LENGTH = average / (5*(max-min));
-	/*if (PERCENT_INTERVAL_LENGTH > 0.5) {
-		PERCENT_INTERVAL_LENGTH = 1 - PERCENT_INTERVAL_LENGTH;
-	}
-	//PERCENT_INTERVAL_LENGTH = 0.5 - PERCENT_INTERVAL_LENGTH;
-	printf("\n\n PERCENT : %f\n\n", PERCENT_INTERVAL_LENGTH);
-	*/
-	//PERCENT_INTERVAL_LENGTH = 0.01;
-	fflush(stdout);
-	// DEBUG end
+	
+
 	
 
 
 	// -- CHOOSING THE INTERVAL LENGTH AND THE NUMBER OF INTERVALS -- //
 	length = max - min + 1; 
-	nb_of_intervals = roundUpDivision(100, (int) 100*PERCENT_INTERVAL_LENGTH);
+	nb_of_intervals = length / (WEIGHT*average / (max-min));
+	if (nb_of_intervals < 1)
+		nb_of_intervals = 1;
 	interval_length = roundUpDivision(length, nb_of_intervals);
-	
-	//interval_length = sqrt(average);
-	//interval_length = roundUpDivision(average, 20);
-	
-	//interval_length = (average / (max-min))*(average/10);
 	// Need to readjust the nbr of intervals
 	nb_of_intervals = roundUpDivision(length, interval_length);
-	// END TODO EN CONSTRUCTION
-	
-	// DEBUG TODO
-	printf("\n\n Length Interval : %d ~ %f * %d", interval_length, PERCENT_INTERVAL_LENGTH, length);
-	printf("\nNbr Interval: %d\n", nb_of_intervals);
-	fflush(stdout);
 	
 	// -- ALLOCATING MEMORY -- //
 	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
-	frequencies_intervals = (int*) palloc(sizeof(int) * nb_of_intervals);
-	//memset(normalized_frequencies_vals, 0, sizeof(float) * nb_of_intervals);
-	memset(frequencies_intervals, 0, sizeof(int) * nb_of_intervals);
 
 	// -- BUILDING THE FREQUENCY HISTOGRAM -- //
-	count_frequencies(lowers, uppers, normalized_frequencies_vals, frequencies_intervals, nb_of_intervals, rows, interval_length, min);
+	count_frequencies(lowers, uppers, normalized_frequencies_vals, nb_of_intervals, rows, interval_length, min);
 
 	// -- STORING THE HISTOGRAM FOR LATER USAGE -- //
 	Datum* hist_normalized_frequencies_vals = (Datum *) palloc(sizeof(Datum) * nb_of_intervals);
@@ -214,14 +190,13 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	
 	// -- FREEING ALLOCATED MEMORY -- //
 	pfree(normalized_frequencies_vals);
-	pfree(frequencies_intervals);
 }
 
 static void
-count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_frequencies_vals, int* frequencies_intervals, int nb_of_intervals, int rows, int interval_length, int min)
+count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_frequencies_vals, int nb_of_intervals, int rows, int interval_length, int min)
 {
 	///////////////////////
-	//      HISTOGRAM    //
+	//     HISTOGRAM     //
 	///////////////////////
 	
 	int i;
@@ -246,7 +221,6 @@ count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_fre
 	for (i = 0; i < nb_of_intervals; ++i){
 		count = 0.0;
 		sup += interval_length;
-		frequencies_intervals[i] = sup; // fixme delete (optimizer)
 		
 		for (k=u; k < l; k++) {
 			if ((uppers+k)->val < sup) {
