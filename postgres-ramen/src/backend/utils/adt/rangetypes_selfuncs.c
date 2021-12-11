@@ -127,134 +127,194 @@ rangeoverlapsrestsel(PG_FUNCTION_ARGS)
  */
 Datum
 rangestrictleftrestsel(PG_FUNCTION_ARGS)
-{
+{	
+	// ███████████████████████████████
+	//        ▀█▄▀▄▀████▀  ▀█▄▀▄▀████▀
+	//          ▀█▄█▄█▀   ez  ▀█▄█▄█▀ 
+
+
 	printf("Hello World OID_RANGE_LEFT_OP\n");
 	fflush(stdout);
-	// PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_LEFT_OP));
+	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
+    Oid         operator = PG_GETARG_OID(1);
+    List       *args = (List *) PG_GETARG_POINTER(2);
+    JoinType    jointype = (JoinType) PG_GETARG_INT16(3);
+    SpecialJoinInfo *sjinfo = (SpecialJoinInfo *) PG_GETARG_POINTER(4);
+    Oid         collation = PG_GET_COLLATION();
 
-	// //init
-	// PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
-	// Oid			operator = PG_GETARG_OID(1);
-	// List	   *args = (List *) PG_GETARG_POINTER(2);
-	// int			varRelid = PG_GETARG_INT32(3);
-	// VariableStatData vardata;
-	// Node	   *other;
-	// bool		varonleft;
-	// Selectivity selec;
-	// TypeCacheEntry *typcache = NULL;
-	// RangeType  *constERROR:  syntax error at or near "#!/"LINE 1: #!/bin/bashrange = NULL;
-
-	// //check si cste
-	// if (!get_restriction_variable(root, args, varRelid,
-	// 							  &vardata, &other, &varonleft)) // szymon: ici on rempli vardata (table) et other (cste)
-	// 	PG_RETURN_FLOAT8(default_range_selectivity(operator));
-
-	// //on quitte si c'est dla merde
-	// if (!IsA(other, Const))
-	// {
-	// 	ReleaseVariableStats(vardata);
-	// 	PG_RETURN_FLOAT8(default_range_selectivity(operator));
-	// }
-
-	// //jsp ce que c'est mais jcrois faut lmettre 
-	// if (((Const *) other)->constisnull)
-	// {
-	// 	ReleaseVariableStats(vardata);
-	// 	PG_RETURN_FLOAT8(0.0);
-	// }
-
-	// // szymon: on gros comme on travaille avec table + cst, ils inversent justent leur position
-	// if (!varonleft)
-	// {
-	// 	/* we have other Op var, commute to make var Op other */
-	// 	operator = get_commutator(operator);
-	// 	if (!operator)
-	// 	{
-	// 		/* Use default selectivity (should we raise an error instead?) */
-	// 		ReleaseVariableStats(vardata);
-	// 		PG_RETURN_FLOAT8(default_range_selectivity(operator));
-	// 	}
-	// }
-
-	// //
-	// if (operator == OID_RANGE_CONTAINS_ELEM_OP)
-	// {
-	// 	typcache = range_get_typcache(fcinfo, vardata.vartype);
-
-	// 	if (((Const *) other)->consttype == typcache->rngelemtype->type_id)
-	// 	{
-	// 		RangeBound	lower,
-	// 					upper;
-
-	// 		lower.inclusive = true;
-	// 		lower.val = ((Const *) other)->constvalue;
-	// 		lower.infinite = false;
-	// 		lower.lower = true;
-	// 		upper.inclusive = true;
-	// 		upper.val = ((Const *) other)->constvalue;
-	// 		upper.infinite = false;
-	// 		upper.lower = false;
-	// 		constrange = range_serialize(typcache, &lower, &upper, false);
-	// 	}
-	// }
+    VariableStatData vardata1;//, vardata2;
+    Oid         opfuncoid;
+    AttStatsSlot sslot1;
+    int         nhist1;
+    int         i;
+    Form_pg_statistic stats1 = NULL;
+    TypeCacheEntry* typcache = NULL;
+    bool        join_is_reversed; // TODO Pas ENCORE utilisé, ici, mais potentiellement important. 
+    bool        empty;
+    AttStatsSlot freq_sslot1;
+    int         freq_nb_intervals1;
+    float8*        freq_values1 = NULL;
+    float8 selec = 0.005; // Default selectivty in case something goes wrong.
+	int			varRelid = PG_GETARG_INT32(3);
+	Node	   *other;
+	bool		varonleft;
+	RangeType  *constrange = NULL;
 
 
-	// //idk
-	// if (operator == OID_RANGE_CONTAINS_ELEM_OP)
-	// {
-	// 	typcache = range_get_typcache(fcinfo, vardata.vartype);
+    // -- Quick operator check. -- // 
+	// Nico: OID_RANGE_LEFT_OP <<
+	if (operator != OID_RANGE_LEFT_OP){
+        PG_RETURN_FLOAT8(selec);
+    }
 
-	// 	if (((Const *) other)->consttype == typcache->rngelemtype->type_id)
-	// 	{
-	// 		RangeBound	lower,
-	// 					upper;
+    // -- Retriving important variables. -- //
+	if (!get_restriction_variable(root, args, varRelid, &vardata1, &other, &varonleft)) // szymon: ici on rempli vardata (table) et other (cste)
+		PG_RETURN_FLOAT8(default_range_selectivity(operator));
 
-	// 		lower.inclusive = true;
-	// 		lower.val = ((Const *) other)->constvalue;
-	// 		lower.infinite = false;
-	// 		lower.lower = true;
-	// 		upper.inclusive = true;
-	// 		upper.val = ((Const *) other)->constvalue;
-	// 		upper.infinite = false;
-	// 		upper.lower = false;
-	// 		constrange = range_serialize(typcache, &lower, &upper, false);
-	// 	}
-	// }
-    // // -- Allocating memory for AttStatsSlot (stores our statistics) -- //
-    // memset(&sslot1, 0, sizeof(sslot1));
-    // memset(&sslot2, 0, sizeof(sslot2));
-    // memset(&freq_sslot1, 0, sizeof(freq_sslot1));
-    // memset(&freq_sslot2, 0, sizeof(freq_sslot2));
+    typcache = range_get_typcache(fcinfo, vardata1.vartype);
+    opfuncoid = get_opcode(operator);
+
+	// Case like  int4range(25, 75) << table.R (tsrange)
+	// And other const problems.
+	if (!IsA(other, Const) || (((Const *) other)->constisnull) || !varonleft)
+	{
+		ReleaseVariableStats(vardata1);
+		PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_LEFT_OP));
+	}
 
 
 
+	if (((Const *) other)->consttype != vardata1.vartype)
+	{
+		ReleaseVariableStats(vardata1);
+		PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_LEFT_OP));
+	}
+		/* Both sides are the same range type */
+	typcache = range_get_typcache(fcinfo, vardata1.vartype);
+	constrange = DatumGetRangeTypeP(((Const *) other)->constvalue);
 
-
-    // // -- RETRIVING HISTOGGRAMS -- //
-    // if (HeapTupleIsValid(vardata1.statsTuple) && HeapTupleIsValid(vardata2.statsTuple))
-    // {
-    //     if (! ((get_attstatsslot(&sslot1, vardata1.statsTuple,
-    //                                     STATISTIC_KIND_BOUNDS_HISTOGRAM,
-    //                                     InvalidOid, ATTSTATSSLOT_VALUES)) 
-    //         && (get_attstatsslot(&sslot2, vardata2.statsTuple,
-    //                                     STATISTIC_KIND_BOUNDS_HISTOGRAM,
-    //                                     InvalidOid, ATTSTATSSLOT_VALUES))
-    //         && (get_attstatsslot(&freq_sslot1, vardata1.statsTuple,
-    //                          STATISTIC_KIND_FREQUENCY_HISTOGRAM,
-    //                          InvalidOid, ATTSTATSSLOT_VALUES))
-    //         && (get_attstatsslot(&freq_sslot2, vardata2.statsTuple,
-    //                          STATISTIC_KIND_FREQUENCY_HISTOGRAM,
-    //                          InvalidOid, ATTSTATSSLOT_VALUES))))
-    //     {
-    //         ReleaseVariableStats(vardata1); ReleaseVariableStats(vardata2);
-    //         free_attstatsslot(&sslot1); free_attstatsslot(&sslot2); free_attstatsslot(&freq_sslot1); free_attstatsslot(&freq_sslot2);
-    //         PG_RETURN_FLOAT8(selec);
-    //     }
-    // }
+	if (RangeIsEmpty(constrange)){
+		ReleaseVariableStats(vardata1);
+		PG_RETURN_FLOAT8((float8) 0);
+	}
 	
-	return rangesel(fcinfo);
+
+    // -- Allocating memory for AttStatsSlot (stores our statistics) -- //
+	// Nico : 1 histogram only
+    memset(&sslot1, 0, sizeof(sslot1));
+    memset(&freq_sslot1, 0, sizeof(freq_sslot1));
+
+    // -- STATISTIC CHECK -- //
+    if (!statistic_proc_security_check(&vardata1, opfuncoid))
+        PG_RETURN_FLOAT8((float8) selec);
+
+
+    // -- RETRIVING HISTOGRAM -- //
+    if (HeapTupleIsValid(vardata1.statsTuple))
+    {
+        if (! ((get_attstatsslot(&sslot1, vardata1.statsTuple,
+                                        STATISTIC_KIND_BOUNDS_HISTOGRAM,
+                                        InvalidOid, ATTSTATSSLOT_VALUES)) 
+            && (get_attstatsslot(&freq_sslot1, vardata1.statsTuple,
+                             STATISTIC_KIND_FREQUENCY_HISTOGRAM,
+                             InvalidOid, ATTSTATSSLOT_VALUES))))
+        {
+            ReleaseVariableStats(vardata1); 
+            free_attstatsslot(&sslot1); 
+			free_attstatsslot(&freq_sslot1); 
+            PG_RETURN_FLOAT8(selec);
+        }
+    }
+    else {
+        ReleaseVariableStats(vardata1);
+        free_attstatsslot(&sslot1); 
+		free_attstatsslot(&freq_sslot1); 
+        PG_RETURN_FLOAT8(selec);
+    }
+
+	double hist_selec;
+
+	hist_selec = calc_hist_selectivity(typcache, &vardata1, constrange, operator);
+
+
+
+    //////////////////////
+    // BOUNDS HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
+    //////////////////////
+    RangeBound r_min1, r_max1;
+    int min1, max1;
+    RangeBound buffer;
+
+    // -- Retriving the sizes thr histogram. i.e. the number of rows. -- //
+    nhist1 = sslot1.nvalues;
+
+    // -- Deserializing ranges in order to obtain RangeBounds. -- // --> RangeBounds are ordered from lowest to highest.
+    range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[0]), &r_min1, &buffer, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
+    range_deserialize(typcache, DatumGetRangeTypeP(sslot1.values[nhist1-1]), &buffer, &r_max1, &empty); if (empty) elog(ERROR, "bounds histogram contains an empty range");
+    
+    // -- Getting the integer values from range bounds -- //
+    min1 = r_min1.val;
+    max1 = r_max1.val;
+
+    // -- Retriving the sizes of each histogram. i.e. the number of intervals. -- //
+    freq_nb_intervals1 = freq_sslot1.nvalues;
+
+    // -- Allocating memory for the frequency histograms. -- //
+    freq_values1 = (float8 *) palloc(sizeof(float8) * freq_nb_intervals1);
+   
+    // -- Getting the float values for our frequencies. -- //
+    for (i = 0; i < freq_nb_intervals1; ++i)
+        freq_values1[i] = DatumGetFloat8(freq_sslot1.values[i]);
+    
+    // _debug_print_frequencies(freq_values1, freq_nb_intervals1);
+
+
+    RangeBound    const_lower;
+    RangeBound    const_upper;
+
+	range_deserialize(typcache, constrange, &const_lower, &const_upper, &empty);
+	Assert(! empty);
+
+
+	//TODO Nico récupérer la constante et l'envoyer dans rangestrictleftrestsel_inner
+	//TODO Nico faire rangestrictleftrestsel_inner
+    if (IsInRange(min1, max1)){
+        selec = rangestrictleftrestsel_inner(freq_values1, freq_nb_intervals1, nhist1, min1, max1, const_lower, const_upper);
+    }
+
+    // -- FREE -- //
+    ReleaseVariableStats(vardata1);
+    free_attstatsslot(&sslot1);
+    free_attstatsslot(&freq_sslot1);
+    pfree(freq_values1);
+
+    CLAMP_PROBABILITY(selec);
+
+    fflush(stdout);
+    PG_RETURN_FLOAT8(selec);
+
 }
 
+static int roundUpDivision(int numerator, int divider){
+    int div;
+    div = numerator / divider;
+	if (numerator % divider)
+		++div;
+	return div;
+}
+
+float8 rangestrictleftrestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper)
+{
+	float8 selec = 0.005; // fixme
+	int interval_length = roundUpDivision(max1 - min1, freq_nb_intervals1);
+
+	//faire des trucs
+	/* ... */
+
+	//pasta la vista baby
+
+	return selec;
+}
 
 
 

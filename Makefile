@@ -17,3 +17,5 @@ aure:
 	sudo /home/ubuntu/Postgres-RangeTypes/scripts/compile-psql.sh /home/ubuntu/Postgres-RangeTypes/postgres-ramen /home/ubuntu/Postgres-RangeTypes/scripts/psql-script.sql
 
 nico:
+	clear
+	sudo /home/kali/Desktop/ramen/Postgres-RangeTypes/scripts/compile-psql.sh /home/kali/Desktop/ramen/Postgres-RangeTypes/postgres-ramen/ /home/kali/Desktop/ramen/Postgres-RangeTypes/scripts/psql-script.sql
