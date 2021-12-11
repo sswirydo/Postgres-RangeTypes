@@ -23,15 +23,15 @@ DROP table integers2;
 */
 
 
-CREATE TABLE restoverlapint(r int4range);
+--CREATE TABLE restoverlapint(r int4range);
 CREATE TABLE reststrleftint(r int4range);
-INSERT INTO restoverlapint SELECT int4range(s, s+10) FROM generate_series(1, 100) AS s;
-INSERT INTO reststrleftint SELECT int4range(s, s+10) FROM generate_series(1, 100) AS s;
-VACUUM ANALYZE restoverlapint;
+--INSERT INTO restoverlapint SELECT int4range(s, s+10) FROM generate_series(1, 10000) AS s;
+INSERT INTO reststrleftint SELECT int4range(s, s+10) FROM generate_series(1, 1000) AS s;
+-- VACUUM ANALYZE restoverlapint;
 VACUUM ANALYZE reststrleftint;
-EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM restoverlapint t1 WHERE t1.r && int4range(25, 75); -- RESTRICTION SELECTIVITY OVERLAP ESTIMATION
+-- EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM restoverlapint t1 WHERE t1.r && int4range(25, 75); -- RESTRICTION SELECTIVITY OVERLAP ESTIMATION
 EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM reststrleftint t1 WHERE t1.r << int4range(25, 75); -- RESTRICTION SELECTIVITY OVERLAP ESTIMATION
-DROP table restoverlapint;
+-- DROP table restoverlapint;
 DROP table reststrleftint;
 
 

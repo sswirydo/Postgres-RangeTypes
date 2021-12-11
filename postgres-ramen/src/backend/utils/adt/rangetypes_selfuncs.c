@@ -30,6 +30,14 @@
 #include "utils/selfuncs.h"
 #include "utils/typcache.h"
 
+
+// -- H-417 OUR FUNCTIONS -- //
+float8 rangestrictleftrestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper);
+static int roundUpDivision(int numerator, int divider);
+static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound);
+// ------------------------- //
+
+
 static double calc_rangesel(TypeCacheEntry *typcache, VariableStatData *vardata,
 							const RangeType *constval, Oid operator);
 static double default_range_selectivity(Oid operator);
@@ -116,8 +124,8 @@ rangeoverlapsrestsel(PG_FUNCTION_ARGS)
 			rangestrictleftrestsel FUNCTION BELOW.
 		(this one simply calls the default rangesel() function)
 	*/
-	printf("Hello World OID_RANGE_OVERLAP_OP\n");
-	fflush(stdout);
+	// printf("Hello World OID_RANGE_OVERLAP_OP\n");
+	// fflush(stdout);
 	// PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_OVERLAP_OP));
 	return rangesel(fcinfo);
 }
@@ -133,8 +141,8 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
 	//          ▀█▄█▄█▀   ez  ▀█▄█▄█▀ 
 
 
-	printf("Hello World OID_RANGE_LEFT_OP\n");
-	fflush(stdout);
+	// printf("Hello World OID_RANGE_LEFT_OP\n");
+	// fflush(stdout);
 	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
     Oid         operator = PG_GETARG_OID(1);
     List       *args = (List *) PG_GETARG_POINTER(2);
@@ -142,14 +150,13 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
     SpecialJoinInfo *sjinfo = (SpecialJoinInfo *) PG_GETARG_POINTER(4);
     Oid         collation = PG_GET_COLLATION();
 
-    VariableStatData vardata1;//, vardata2;
+    VariableStatData vardata1;
     Oid         opfuncoid;
     AttStatsSlot sslot1;
     int         nhist1;
     int         i;
     Form_pg_statistic stats1 = NULL;
     TypeCacheEntry* typcache = NULL;
-    bool        join_is_reversed; // TODO Pas ENCORE utilisé, ici, mais potentiellement important. 
     bool        empty;
     AttStatsSlot freq_sslot1;
     int         freq_nb_intervals1;
@@ -159,55 +166,52 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
 	Node	   *other;
 	bool		varonleft;
 	RangeType  *constrange = NULL;
+	RangeBound    const_lower;
+    RangeBound    const_upper;
 
 
     // -- Quick operator check. -- // 
-	// Nico: OID_RANGE_LEFT_OP <<
 	if (operator != OID_RANGE_LEFT_OP){
         PG_RETURN_FLOAT8(selec);
     }
 
     // -- Retriving important variables. -- //
-	if (!get_restriction_variable(root, args, varRelid, &vardata1, &other, &varonleft)) // szymon: ici on rempli vardata (table) et other (cste)
+	if (!get_restriction_variable(root, args, varRelid, &vardata1, &other, &varonleft))
 		PG_RETURN_FLOAT8(default_range_selectivity(operator));
 
     typcache = range_get_typcache(fcinfo, vardata1.vartype);
     opfuncoid = get_opcode(operator);
 
-	// Case like  int4range(25, 75) << table.R (tsrange)
-	// And other const problems.
+
+	// Differet possible problems + the case where the const is on the left.
 	if (!IsA(other, Const) || (((Const *) other)->constisnull) || !varonleft)
 	{
 		ReleaseVariableStats(vardata1);
 		PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_LEFT_OP));
 	}
 
-
-
+	// We check if the range types match correctly.
 	if (((Const *) other)->consttype != vardata1.vartype)
 	{
 		ReleaseVariableStats(vardata1);
 		PG_RETURN_FLOAT8(default_range_selectivity(OID_RANGE_LEFT_OP));
 	}
-		/* Both sides are the same range type */
-	typcache = range_get_typcache(fcinfo, vardata1.vartype);
+
 	constrange = DatumGetRangeTypeP(((Const *) other)->constvalue);
 
+	// Empty check.
 	if (RangeIsEmpty(constrange)){
 		ReleaseVariableStats(vardata1);
 		PG_RETURN_FLOAT8((float8) 0);
 	}
 	
-
     // -- Allocating memory for AttStatsSlot (stores our statistics) -- //
-	// Nico : 1 histogram only
     memset(&sslot1, 0, sizeof(sslot1));
     memset(&freq_sslot1, 0, sizeof(freq_sslot1));
 
     // -- STATISTIC CHECK -- //
     if (!statistic_proc_security_check(&vardata1, opfuncoid))
         PG_RETURN_FLOAT8((float8) selec);
-
 
     // -- RETRIVING HISTOGRAM -- //
     if (HeapTupleIsValid(vardata1.statsTuple))
@@ -232,15 +236,9 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
         PG_RETURN_FLOAT8(selec);
     }
 
-	double hist_selec;
-
-	hist_selec = calc_hist_selectivity(typcache, &vardata1, constrange, operator);
-
-
-
-    //////////////////////
-    // BOUNDS HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
-    //////////////////////
+    ////////////////////////////////////
+    // BOUNDS AND FREQUENCY HISTOGRAM // --> All we need are the sizes of each histogram and the min and max values of each.
+    ////////////////////////////////////
     RangeBound r_min1, r_max1;
     int min1, max1;
     RangeBound buffer;
@@ -265,22 +263,11 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
     // -- Getting the float values for our frequencies. -- //
     for (i = 0; i < freq_nb_intervals1; ++i)
         freq_values1[i] = DatumGetFloat8(freq_sslot1.values[i]);
-    
-    // _debug_print_frequencies(freq_values1, freq_nb_intervals1);
-
-
-    RangeBound    const_lower;
-    RangeBound    const_upper;
 
 	range_deserialize(typcache, constrange, &const_lower, &const_upper, &empty);
 	Assert(! empty);
 
-
-	//TODO Nico récupérer la constante et l'envoyer dans rangestrictleftrestsel_inner
-	//TODO Nico faire rangestrictleftrestsel_inner
-    if (IsInRange(min1, max1)){
-        selec = rangestrictleftrestsel_inner(freq_values1, freq_nb_intervals1, nhist1, min1, max1, const_lower, const_upper);
-    }
+	selec = rangestrictleftrestsel_inner(freq_values1, freq_nb_intervals1, nhist1, min1, max1, const_lower, const_upper);
 
     // -- FREE -- //
     ReleaseVariableStats(vardata1);
@@ -290,7 +277,6 @@ rangestrictleftrestsel(PG_FUNCTION_ARGS)
 
     CLAMP_PROBABILITY(selec);
 
-    fflush(stdout);
     PG_RETURN_FLOAT8(selec);
 
 }
@@ -303,19 +289,35 @@ static int roundUpDivision(int numerator, int divider){
 	return div;
 }
 
+static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up_bound)
+{
+	// A && B <=> NOT (A << B OR A >> B)
+	return ! (challenge_up < low_bound || challenge_low > up_bound);
+}
+
 float8 rangestrictleftrestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper)
 {
-	float8 selec = 0.005; // fixme
+	float8 selec = 0.005;
 	int interval_length = roundUpDivision(max1 - min1, freq_nb_intervals1);
+	int i;
+	int x, y;
+	int a = const_lower.val;
+	int b = const_upper.val;
+	float8 sum = 0;
 
-	//faire des trucs
-	/* ... */
+	for (i = 0; i < freq_nb_intervals1; ++i){
+		x = min1 + i * interval_length;
+		y = min1 + (i+1) * interval_length;
 
-	//pasta la vista baby
+		if (IsInRange(x, y, a, b))
+			break;
+		else
+			sum += *(freq_values1+i);
+	}
+	selec = sum / (rows1);
 
 	return selec;
 }
-
 
 
 
