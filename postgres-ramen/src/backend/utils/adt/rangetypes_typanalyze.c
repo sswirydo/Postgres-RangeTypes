@@ -33,8 +33,8 @@
 
 // -- H-417 OUR FUNCTIONS -- //
 static void ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows);
-static void count_frequencies(RangeBound* lowers, RangeBound* uppers, int* frequencies_vals, int* frequencies_intervals, int* sum_hist, int nb_of_intervals, int rows, int interval_length, int min);
-static void normalize_frequencies(float8* normalized_frequencies_vals, int* frequencies_vals, int* sum_hist, int nb_of_intervals, int rows);
+static void count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_frequencies_vals, int nb_of_intervals, int rows, int interval_length, int min);
+static int roundUpDivision(int numerator, int divider);
 // ------------------------ //
 
 
@@ -99,6 +99,16 @@ range_bound_qsort_cmp(const void *a1, const void *a2, void *arg)
 	return range_cmp_bounds(typcache, b1, b2);
 }
 
+static int 
+roundUpDivision(int numerator, int divider)
+{
+    int div;
+    div = numerator / divider;
+	if (numerator % divider)
+		++div;
+	return div;
+}
+
 
 static void
 ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers, RangeBound* uppers, int rows)
@@ -113,7 +123,8 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	} RangeBound;
 	*/
 
-	int PERCENT_INTERVAL_LENGTH = 5; //FIXME ARBITRARY VALUE : INTERVAL LENGTH = 5% OF TOTAL LENGTH
+	int WEIGHT = 25; //FIXME ARBITRARY VALUE
+
 	int i;
 	int j;
 	int min;
@@ -122,10 +133,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	int length;
 	int interval_length;
 	int nb_of_intervals;
-	int sum_hist;
 
-	int* frequencies_vals;
-	int* frequencies_intervals;
 	float8* normalized_frequencies_vals;
 
 	// No data for floats. Rip. :/
@@ -135,42 +143,44 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 
 	min = (lowers)->val;
 	max = (uppers+rows-1)->val;
+	
+	// BEGIN TODO EXPERIMENTAL
+	int sum_length = 0;
+	for (i=0; i < rows; i++){
+		sum_length += (uppers+i)->val - (lowers+i)->val;
+	}
+	float average;
+	average = sum_length / rows;
+	printf("\n\n AVERAGE : %f", average);
+	printf("\nMIN: %d", min);
+	printf("\nMAX: %d\n", max);
+	
 
-	/*
-	printf("lower: %f\n", (float) min);
-	printf("upper: %d\n", max);
-	fflush(stdout);
-	*/
+	
+
 
 	// -- CHOOSING THE INTERVAL LENGTH AND THE NUMBER OF INTERVALS -- //
-	length = max - min; 
-	interval_length = PERCENT_INTERVAL_LENGTH * length;
-	if (interval_length % 100 == 0)
-		interval_length = interval_length/100;
-	else
-		interval_length = 1 + interval_length/100; // +1 for rounding up.
-	nb_of_intervals = length/interval_length;
-	if (length % interval_length != 0) 
-		nb_of_intervals++; // Rounding
-
+	length = max - min + 1; 
+	nb_of_intervals = length / (WEIGHT*average / (max-min));
+	if (nb_of_intervals < 1)
+		nb_of_intervals = 1;
+	interval_length = roundUpDivision(length, nb_of_intervals);
+	// Need to readjust the nbr of intervals
+	nb_of_intervals = roundUpDivision(length, interval_length);
+	
 	// -- ALLOCATING MEMORY -- //
-	frequencies_vals = (int*) palloc(sizeof(int) * nb_of_intervals);
-	frequencies_intervals = (int*) palloc(sizeof(int) * nb_of_intervals);
 	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
-	memset(frequencies_vals, 0, sizeof(int) * nb_of_intervals);
-	memset(frequencies_intervals, 0, sizeof(int) * nb_of_intervals);
 
 	// -- BUILDING THE FREQUENCY HISTOGRAM -- //
-	count_frequencies(lowers, uppers, frequencies_vals, frequencies_intervals, &sum_hist, nb_of_intervals, rows, interval_length, min);
-	normalize_frequencies(normalized_frequencies_vals, frequencies_vals, &sum_hist, nb_of_intervals, rows);
+	count_frequencies(lowers, uppers, normalized_frequencies_vals, nb_of_intervals, rows, interval_length, min);
 
 	// -- STORING THE HISTOGRAM FOR LATER USAGE -- //
-	Datum* hist_frequencies_vals = (Datum *) palloc(sizeof(Datum) * nb_of_intervals);
+	Datum* hist_normalized_frequencies_vals = (Datum *) palloc(sizeof(Datum) * nb_of_intervals);
 	for (i = 0; i < nb_of_intervals; ++i)
-		hist_frequencies_vals[i] = Float8GetDatum(normalized_frequencies_vals[i]);
+		hist_normalized_frequencies_vals[i] = Float8GetDatum(normalized_frequencies_vals[i]);
 	stats->staop[slot_idx] = Float8LessOperator;
 	stats->stacoll[slot_idx] = InvalidOid;
-	stats->stavalues[slot_idx] = hist_frequencies_vals;
+	stats->stavalues[slot_idx] = hist_normalized_frequencies_vals;
 	stats->numvalues[slot_idx] = nb_of_intervals;
 	stats->statypid[slot_idx] = FLOAT8OID;
 	stats->statyplen[slot_idx] = sizeof(float8);
@@ -179,54 +189,72 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	stats->stakind[slot_idx] = STATISTIC_KIND_FREQUENCY_HISTOGRAM;
 	
 	// -- FREEING ALLOCATED MEMORY -- //
-	pfree(frequencies_vals);
-	pfree(frequencies_intervals);
 	pfree(normalized_frequencies_vals);
 }
 
 static void
-count_frequencies(RangeBound* lowers, RangeBound* uppers, int* frequencies_vals, int* frequencies_intervals, int* sum_hist, int nb_of_intervals, int rows, int interval_length, int min)
+count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_frequencies_vals, int nb_of_intervals, int rows, int interval_length, int min)
 {
 	///////////////////////
-	// CLASSIC HISTOGRAM //
+	//     HISTOGRAM     //
 	///////////////////////
 	
-	*(sum_hist) = 0;
 	int i;
 	int l = 0;
 	int u = 0;
-	int count = 0;
+	float count = 0.0;
 	int sup = min - 1;
 
+	// DEBUG
+	printf("\nLOWER : ");
+	for (i=0; i < rows; i++){
+		printf("%d ,", (lowers+i)->val);
+	}
+	printf("\nUPPER : ");
+	for (i=0; i < rows; i++){
+		printf("%d ,", (uppers+i)->val);
+	}
+	
+	int mult;
+	int k;
+
 	for (i = 0; i < nb_of_intervals; ++i){
+		count = 0.0;
 		sup += interval_length;
-		frequencies_intervals[i] = sup; // fixme delete (optimizer)
+		
+		for (k=u; k < l; k++) {
+			if ((uppers+k)->val < sup) {
+				mult = (uppers+k)->val - (sup - interval_length + 1);
+			}
+			else {
+				mult = interval_length;
+			}
+			count += (float) mult / ((uppers+k)->val - (lowers+k)->val);
+			//printf("\n'+ %f = %d / (%d - %d)", count , mult, (uppers+k)->val, (lowers+k)->val); // DEBUG
+		
+		}
 		while((int)(lowers+l)->val <= sup && l < rows){
-			count++;
+			if (sup <= (uppers+l)->val) {
+				mult = 1 + sup - (lowers+l)->val;
+			}
+			else {
+				mult = (uppers+l)->val - (lowers+l)->val;
+			}
+			count += (float) mult / ((uppers+l)->val - (lowers+l)->val);
+			//printf("\n+ %f = %d / (%d - %d)", count , mult, (uppers+l)->val, (lowers+l)->val); // DEBUG
 			l++;
 		}
-		frequencies_vals[i] = count;
-		*(sum_hist) += count;
+		normalized_frequencies_vals[i] = count;
 		while((int)(uppers+u)->val <= sup + 1 && u < rows){ // TO VERIFY '&& u < rows' (normaly not useful)
-			count--;
 			u++;
-		}
+		}//*/
 	}
-}
-
-static void
-normalize_frequencies(float8* normalized_frequencies_vals, int* frequencies_vals, int* sum_hist, int nb_of_intervals, int rows)
-{
-	/////////////////////////////
-	// HISTOGRAM NORMALIZATION //
-	/////////////////////////////
 	
-	int i;
-	float ratio;
-	ratio = ((float) rows) / (float) *(sum_hist); // divided by "sum_hist" (= percentage) -> multiply by "rows" (weighted)
-	
-	for (i = 0; i < nb_of_intervals; ++i)
-		normalized_frequencies_vals[i] = (float8) ((float) frequencies_vals[i] * ratio);
+	// DEBUG
+	for (i = 0; i < nb_of_intervals; ++i){
+		//printf("\n||%d : %f", i, normalized_frequencies_vals[i]);  // DEBUG
+	}
+	//fflush(stdout); // DEBUG
 }
 
 
@@ -299,12 +327,15 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			lowers[non_empty_cnt] = lower;
 			uppers[non_empty_cnt] = upper;
 
+			// -------------------------- //
 			// No data for floats. Rip. :/
-			//printf("lower: %d\n", lower.val);
-
-		 	printf("lower: %f\n", (float) lower.val);
-		 	printf("upper: %f\n", DatumGetFloat8((upper.val)));
-			// fflush(stdout);
+			// printf("-VALS:\n");
+			// printf("val: %lf\n", (float) lower.val);
+			// printf("val: %lf\n", (float8) lower.val);
+			// printf("val: %lf\n", DatumGetFloat8(lower.val));
+			// printf("val: %lf\n", (float8) DatumGetFloat8(lower.val));
+			// printf("val: %lf\n", (float) DatumGetFloat8(lower.val));
+			// -------------------------- //
 
 			// -- szymon: cette partie on calcule la longueur par rapport aux lower and upper bounds -- //
 			if (lower.infinite || upper.infinite) // szymon: si range infinie, length infinie

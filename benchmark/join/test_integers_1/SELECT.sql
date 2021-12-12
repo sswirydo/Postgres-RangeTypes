@@ -1,0 +1,1 @@
+EXPLAIN (ANALYZE, BUFFERS) SELECT count(*) FROM integers1 t1, integers2 t2 WHERE t1.r && t2.r; -- JOIN CARDINALITY ESTIMATION

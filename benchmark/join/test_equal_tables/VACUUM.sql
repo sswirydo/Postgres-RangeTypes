@@ -1,0 +1,2 @@
+VACUUM ANALYZE integers2;
+VACUUM ANALYZE integers2BIS;
