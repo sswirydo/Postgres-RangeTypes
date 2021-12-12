@@ -259,7 +259,10 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
     }
 
     if (! stop){
-        result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1+interval_length1, min_val2+interval_length2);
+    	if (interval_length1 >= interval_length2)
+        	result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
+        else
+        	result = computeSelectivity(freq_values2 + y_low, freq_values1 + x_low, (y_high - y_low) + 1, (x_high - x_low) + 1, interval_length2, interval_length1, min_val2, min_val1);
         printf("\nRESULT rows (sample) : %f", result);  // DEBUG
         result = result / (rows1*rows2);
         printf("\nRESULT percentage : %f", result);  // DEBUG
@@ -275,33 +278,51 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
 //on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
 //sinon lorsque valeures trop différentes problème pour la limit
 //O(max(size1,size2))
-float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int max1, int max2){
+float8 computeSelectivity(float8* freq1, float8* freq2, int size1, int size2, int interval_length1, int interval_length2, int limit1, int limit2){
+    // NB : interval_length1 >= interval_length2
     int idx_1 = 0;
     int idx_2 = 0;
     
+    int length_prod;
+    length_prod = interval_length1 * interval_length2;
+    float length_fact;
+    length_fact = (float) interval_length2 / interval_length1;
+    
     float8 total = 0;
-    //printf("\ninter : %d-%d", interval_length1, interval_length2);  // DEBUG
-    //printf("\nsize : %d-%d", size1, size2);  // DEBUG
+    printf("\ninter : %d-%d", interval_length1, interval_length2);  // DEBUG
+    printf("\nsize : %d-%d", size1, size2);  // DEBUG
+
+	    
     while(idx_1 < size1 && idx_2 < size2){
-    	total += trunc_freq1[idx_1] * trunc_freq2[idx_2];
-    	//printf("\nsup1 : %d & sup2: %d", max1, max2);  // DEBUG
-    	//printf("\ntotal : %f += %f * %f             :: %d-%d", total, trunc_freq1[idx_1], trunc_freq2[idx_2], idx_1, idx_2);  // DEBUG
-    	if(max1 < max2){
-    		max1 += interval_length1;
+    	if (limit1 < limit2) {
+    		limit1 += interval_length1;
+    		if (limit1 < limit2 + interval_length2)
+    		{
+    			total += freq1[idx_1] * freq2[idx_2] * pow(limit1 - limit2, 2) / length_prod;
+    			printf("\n1 %d limit : %d - %d -> %f - %f", limit1 - limit2, limit1, limit2, freq1[idx_1], freq2[idx_2]); // DEBUG
+    		}
+    		else {
+    			limit1 -= interval_length1;
+    			limit2 += interval_length2;
+    			total += freq1[idx_1] * freq2[idx_2] * length_fact;
+    			printf("\n %d - limit : %d - %d -> %f - %f", interval_length2, limit1, limit2, freq1[idx_1], freq2[idx_2]);  // DEBUG
+    			printf("\n %f %f %f %f", freq1[idx_1] * freq2[idx_2] * length_fact, freq1[idx_1], freq2[idx_2],  length_fact);  // DEBUG
+    			idx_1--;
+    			idx_2++;
+    		}
     		idx_1++;
+
     	}
-    	else if(max2 < max1){
-    		max2 += interval_length2;
+    	else if (limit2 < limit1) {
+    		limit2 += interval_length2;
+    		total += freq1[idx_1] * freq2[idx_2] * pow(limit2 - limit1, 2) / length_prod;
+    		printf("\n2 %d limit : %d - %d -> %f - %f", limit2 - limit1, limit1, limit2, freq1[idx_1], freq2[idx_2]); // DEBUG
     		idx_2++;
-    	}
-    	else{
-    		max1 += interval_length1;
-    		idx_1++;
-    		max2 += interval_length2;
-    		idx_2++;
+
     	}
     } 
-    //fflush(stdout);  // DEBUG
+    printf("\n\n TOT : %f", total);
+    fflush(stdout);  // DEBUG
     return total;
 }
 
