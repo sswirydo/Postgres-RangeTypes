@@ -147,8 +147,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 
 	// -- CHOOSING THE INTERVAL LENGTH AND THE NUMBER OF INTERVALS -- //
 	length = max - min + 1; 
-	interval_length = 1 + WEIGHT*length;
-	nb_of_intervals = roundUpDivision(length, interval_length);
+	nb_of_intervals = roundUpDivision(length, 1 + WEIGHT*length);
 	// Need to readjust values
 	interval_length = roundUpDivision(length, nb_of_intervals);
 	
@@ -526,9 +525,10 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 		stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
 
 		++slot_idx;
-		
-		ComputeFrequencyHistogram(stats, slot_idx, temp_lowers, temp_uppers, num_hist); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
-		//ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, samplerows);
+
+
+		ComputeFrequencyHistogram(stats, slot_idx, temp_lowers, temp_uppers, num_hist);
+		//ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, non_empty_cnt);
 
 
 		MemoryContextSwitchTo(old_cxt);

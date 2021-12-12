@@ -174,9 +174,6 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     for (i = 0; i < freq_nb_intervals2; ++i)
         freq_values2[i] = DatumGetFloat8(freq_sslot2.values[i]);
 
-    // _debug_print_frequencies(freq_values1, freq_nb_intervals1);
-    // _debug_print_frequencies(freq_values2, freq_nb_intervals2);
-
     ///////////////////////////////////////
     // OVERLAP JOIN SELECTIVY ESTIMATION //
     ///////////////////////////////////////
@@ -258,19 +255,17 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
         }
     }
 
+    // if (! stop){
+    // 	if (interval_length1 >= interval_length2)
+    //     	result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
+    //     else
+    //     	result = computeSelectivity(freq_values2 + y_low, freq_values1 + x_low, (y_high - y_low) + 1, (x_high - x_low) + 1, interval_length2, interval_length1, min_val2, min_val1);
+
     if (! stop){
-    	if (interval_length1 >= interval_length2)
-        	result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
-        else
-        	result = computeSelectivity(freq_values2 + y_low, freq_values1 + x_low, (y_high - y_low) + 1, (x_high - x_low) + 1, interval_length2, interval_length1, min_val2, min_val1);
-        printf("\nRESULT rows (sample) : %f", result);  // DEBUG
+        result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
         result = result / (rows1*rows2);
-        printf("\n\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ROWS : %d x %d\n", rows1, rows2);
-        printf("\nRESULT percentage : %f", result);  // DEBUG
     }
-    if (result > 1)
-    	result = 1.00;
-    fflush(stdout);  // DEBUG
+
     return result;
 }
 
@@ -279,6 +274,35 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
 //on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
 //sinon lorsque valeures trop différentes problème pour la limit
 //O(max(size1,size2))
+float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int min1, int min2){
+    int idx_1 = 0;
+    int idx_2 = 0;
+    
+    float8 total = 0;
+    
+    while(idx_1 < size1 && idx_2 < size2){
+    	total += trunc_freq1[idx_1] * trunc_freq2[idx_2];
+    	if(min1 < min2){
+    		min1 += interval_length1;
+    		idx_1++;
+    	}
+    	else if(min1 > min2){
+    		min2 += interval_length2;
+    		idx_2++;
+    	}
+    	else{
+    		min1 += interval_length1;
+    		idx_1++;
+    		min2 += interval_length2;
+    		idx_2++;
+    	}
+    } 
+
+    return total; //TODO normalize result
+}
+
+
+/*
 float8 computeSelectivity(float8* freq1, float8* freq2, int size1, int size2, int interval_length1, int interval_length2, int limit1, int limit2){
     // NB : interval_length1 >= interval_length2
     int idx_1 = 0;
@@ -336,6 +360,7 @@ float8 computeSelectivity(float8* freq1, float8* freq2, int size1, int size2, in
     fflush(stdout);  // DEBUG
     return total;
 }
+*/
 
 static int roundUpDivision(int numerator, int divider){
     int div;
