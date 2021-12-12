@@ -13,7 +13,7 @@ Commit : https://github.com/postgres/postgres/commit/f76fd05bae047103cb36ef5fb82
 Our modified version of postgreSQL. Why ramen? Cause why not, every one loves ramen.
 
 #### rangetypes_typeanalyze.c
-[a relative link] ./postgres-ramen/src/backend/utils/adt/rangetypes_typanalyze.c
+[a relative link](./postgres-ramen/src/backend/utils/adt/rangetypes_typanalyze.c)
 
 
 ### Debug printing
