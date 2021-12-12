@@ -246,10 +246,10 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
             max_val2 -= interval_length2;
             --y_high;
         }
-        else {printf("???"); --x_high; --y_high;}
+        else {elog(ERROR, "rangeoverlapsjoinsel_inner: values in range. Slowly quitting the loop."); --x_high; --y_high;}
 
         if (x_high == 0 | y_high == 0) {
-            printf(">>> STOP HIGH.\n");
+            elog(ERROR, "rangeoverlapsjoinsel_inner: Overlap not found. Stopping");
             stop++;
             break;
         }
