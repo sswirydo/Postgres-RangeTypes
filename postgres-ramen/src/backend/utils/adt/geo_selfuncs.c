@@ -70,7 +70,7 @@ Datum rangeoverlapsjoinsel(PG_FUNCTION_ARGS)
     Form_pg_statistic stats1 = NULL;
     Form_pg_statistic stats2 = NULL;
     TypeCacheEntry* typcache = NULL;
-    bool        join_is_reversed; // TODO Pas ENCORE utilisé, ici, mais potentiellement important. 
+    bool        join_is_reversed; // Actually not used here.
     bool        empty;
     AttStatsSlot freq_sslot1, freq_sslot2;
     int         freq_nb_intervals1, freq_nb_intervals2;
@@ -227,10 +227,10 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
             min_val2 += interval_length2;
             ++y_low;
         }
-        else {printf("???"); ++x_low;  ++y_low;}
+        else {elog(ERROR, "rangeoverlapsjoinsel_inner: values in range. Slowly quitting the loop."); ++x_low;  ++y_low;}
 
         if (x_low == freq_nb_intervals1 | y_low == freq_nb_intervals2) {
-            printf(">>> STOP LOW.\n");
+            elog(ERROR, "rangeoverlapsjoinsel_inner: Overlap not found. Stopping");
             stop++;
             break;
         }
@@ -255,25 +255,22 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
         }
     }
 
-    // if (! stop){
-    // 	if (interval_length1 >= interval_length2)
-    //     	result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
-    //     else
-    //     	result = computeSelectivity(freq_values2 + y_low, freq_values1 + x_low, (y_high - y_low) + 1, (x_high - x_low) + 1, interval_length2, interval_length1, min_val2, min_val1);
-
     if (! stop){
         result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
         result = result / (rows1*rows2);
     }
 
+    // if (! stop){
+    // 	if (interval_length1 >= interval_length2)
+    //     	result = computeSelectivity(freq_values1 + x_low, freq_values2 + y_low, (x_high - x_low) + 1, (y_high - y_low) + 1, interval_length1, interval_length2, min_val1, min_val2);
+    //     else
+    //     	result = computeSelectivity(freq_values2 + y_low, freq_values1 + x_low, (y_high - y_low) + 1, (x_high - x_low) + 1, interval_length2, interval_length1, min_val2, min_val1);
+    // }
+
     return result;
 }
 
-//alex: on tronque les tables lorsqu'on a les bornes mins et max comme ca on part de 0 pour les 2 on a alors juste:
-//static Selectivity calculateSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2)
-//on les parcourt alors de 0 jusqu'à max(size1,size2) et on applique l'algo en bas 
-//sinon lorsque valeures trop différentes problème pour la limit
-//O(max(size1,size2))
+
 float8 computeSelectivity(float8* trunc_freq1, float8* trunc_freq2, int size1, int size2, int interval_length1, int interval_length2, int min1, int min2){
     int idx_1 = 0;
     int idx_2 = 0;
@@ -357,7 +354,7 @@ float8 computeSelectivity(float8* freq1, float8* freq2, int size1, int size2, in
         }
     } 
     printf("\n\n TOT : %f", total);
-    fflush(stdout);  // DEBUG
+    fflush(stdout);
     return total;
 }
 */

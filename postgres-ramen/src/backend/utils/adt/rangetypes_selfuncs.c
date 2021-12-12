@@ -70,7 +70,7 @@ static double calc_hist_selectivity_contains(TypeCacheEntry *typcache,
 
 
 /*
- * rangerestsel -- restriction selectivity for strictly left range operator (OID_RANGE_LEFT_OP) and verlap range operator (OID_RANGE_OVERLAP_OP)
+ * rangerestsel -- restriction selectivity for strictly left range operator (OID_RANGE_LEFT_OP) and verlap range operator (OID_RANGE_LEFT_OP)
  */
 Datum
 rangerestsel(PG_FUNCTION_ARGS)
@@ -80,8 +80,7 @@ rangerestsel(PG_FUNCTION_ARGS)
 	//          ▀█▄█▄█▀   ez  ▀█▄█▄█▀ 
 
 
-	// printf("Hello World OID_RANGE_LEFT_OP\n");
-	// fflush(stdout);
+	// printf("Hello World OID_RANGE_LEFT_OP and OID_RANGE_LEFT_OP\n"); fflush(stdout);
 	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
     Oid         operator = PG_GETARG_OID(1);
     List       *args = (List *) PG_GETARG_POINTER(2);
@@ -204,7 +203,7 @@ rangerestsel(PG_FUNCTION_ARGS)
 	range_deserialize(typcache, constrange, &const_lower, &const_upper, &empty);
 	Assert(! empty);
 
-	selec = rangerestsel_inner(freq_values1, freq_nb_intervals1, nhist1, min1, max1, const_lower, const_upper, operator); // FIXME see above
+	selec = rangerestsel_inner(freq_values1, freq_nb_intervals1, nhist1, min1, max1, const_lower, const_upper, operator);
 
     // -- FREE -- //
     ReleaseVariableStats(vardata1);
@@ -232,7 +231,7 @@ static bool IsInRange(int challenge_low, int challenge_up, int low_bound, int up
 	return ! (challenge_up < low_bound || challenge_low > up_bound);
 }
 
-float8 rangerestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper, Oid operator) // FIXME SZYMON TODO rows1 = samplerows (from rangetypes_typanalaze.c) (ou en tout cas, rows1 doit être égale au nombre de rows total
+float8 rangerestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows1, int min1, int max1, RangeBound const_lower, RangeBound const_upper, Oid operator)
 {
 	float8 selec;
 	int interval_length = roundUpDivision(max1 - min1, freq_nb_intervals1);
@@ -280,7 +279,7 @@ float8 rangerestsel_inner(float8* freq_values1, int freq_nb_intervals1, int rows
 
 	selec = sum / rows1;
 	
-	printf("\nSELEC : %f = %f / %d", selec, sum, rows1);
+	//printf("\nSELEC : %f = %f / %d", selec, sum, rows1);
 
 	return selec;
 }

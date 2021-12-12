@@ -123,7 +123,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	} RangeBound;
 	*/
 
-	float WEIGHT = 0.05; //FIXME ARBITRARY VALUE
+	const float8 WEIGHT = 0.05; //ARBITRARY VALUE
 
 	int i;
 	int j;
@@ -136,14 +136,8 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 
 	float8* normalized_frequencies_vals;
 
-	// No data for floats. Rip. :/
-	//printf("lower: %f\n", (float) (lower)->val);
-	//printf("upper: %f\n", DatumGetFloat8((upper+rows+1)->val));
-	// fflush(stdout);
-
 	min = (lowers)->val;
 	max = (uppers+rows-1)->val;
-
 
 	// -- CHOOSING THE INTERVAL LENGTH AND THE NUMBER OF INTERVALS -- //
 	length = max - min + 1; 
@@ -187,16 +181,6 @@ count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_fre
 	int u = 0;
 	float count = 0.0;
 	int sup = min - 1;
-
-	// DEBUG
-	printf("\nLOWER : ");
-	for (i=0; i < rows; i++){
-		printf("%d ,", (lowers+i)->val);
-	}
-	printf("\nUPPER : ");
-	for (i=0; i < rows; i++){
-		printf("%d ,", (uppers+i)->val);
-	}
 	
 	int mult;
 	int k;
@@ -213,8 +197,6 @@ count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_fre
 				mult = interval_length;
 			}
 			count += (float) mult / ((uppers+k)->val - (lowers+k)->val);
-			//printf("\n'+ %f = %d / (%d - %d)", count , mult, (uppers+k)->val, (lowers+k)->val); // DEBUG
-		
 		}
 		while((int)(lowers+l)->val <= sup && l < rows){
 			if (sup <= (uppers+l)->val) {
@@ -224,20 +206,13 @@ count_frequencies(RangeBound* lowers, RangeBound* uppers, float8* normalized_fre
 				mult = (uppers+l)->val - (lowers+l)->val;
 			}
 			count += (float) mult / ((uppers+l)->val - (lowers+l)->val);
-			//printf("\n+ %f = %d / (%d - %d)", count , mult, (uppers+l)->val, (lowers+l)->val); // DEBUG
 			l++;
 		}
 		normalized_frequencies_vals[i] = count;
 		while((int)(uppers+u)->val <= sup + 1 && u < rows){ // TO VERIFY '&& u < rows' (normaly not useful)
 			u++;
-		}//*/
+		}
 	}
-	
-	// DEBUG
-	for (i = 0; i < nb_of_intervals; ++i){
-		//printf("\n||%d : %f", i, normalized_frequencies_vals[i]);  // DEBUG
-	}
-	//fflush(stdout); // DEBUG
 }
 
 
