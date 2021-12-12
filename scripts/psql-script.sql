@@ -28,8 +28,8 @@ DROP table integers2;
 
 CREATE TABLE floats1(r numrange);
 CREATE TABLE floats2(r numrange);
-INSERT INTO floats1 SELECT numrange(s*5.2, s*8.1) FROM generate_series(1, 10) AS s;
-INSERT INTO floats2 SELECT numrange((-s)*3.1, s*4.1) FROM generate_series(1, 10) AS s;
+INSERT INTO floats1 SELECT numrange(s*5.2, s*8.1) FROM generate_series(1, 1000) AS s;
+INSERT INTO floats2 SELECT numrange((-s)*3.1, s*4.1) FROM generate_series(1, 1000) AS s;
 
 SELECT * FROM floats1;
 SELECT * FROM floats2;
