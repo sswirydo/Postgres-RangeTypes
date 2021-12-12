@@ -19,10 +19,11 @@ Our modified version of postgreSQL. Why ramen? Cause why not, every one loves ra
 #####
 [rangetypes_selfuncs.c](./postgres-ramen/src/backend/utils/adt/rangetypes_selfuncs.c)
 #####
+[pg_operator.dat](./postgres-ramen/src/include/catalog/pg_operator.dat)
+#####
 [pg_statistic.h](./postgres-ramen/src/include/catalog/pg_statistic.h)
 #####
-[pg_operator.dat](./postgres-ramen/src/include/catalog/pg_operator.dat)
-
+[pg_proc.dat](postgres-ramen/src/include/catalog/pg_proc.dat)
 
 ### Debug printing
 Instead of printing with printf(...) etc., simply put this line in your code
