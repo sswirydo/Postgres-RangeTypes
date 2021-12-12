@@ -14,6 +14,9 @@ Our modified version of postgreSQL. Why ramen? Cause why not, every one loves ra
 
 #### Modified files
 [rangetypes_typeanalyze.c](./postgres-ramen/src/backend/utils/adt/rangetypes_typanalyze.c)
+[geo_selfuncs.c](./postgres-ramen/src/backend/utils/adt/geo_selfuncs.c)
+[rangetypes_selfuncs.c](./postgres-ramen/src/backend/utils/adt/rangetypes_selfuncs.c)
+[pg_statistic.h](./postgres-ramen/src/include/catalog/pg_statistic.h)
 
 
 ### Debug printing
