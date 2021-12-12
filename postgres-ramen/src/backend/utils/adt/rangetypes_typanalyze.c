@@ -123,7 +123,7 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 	} RangeBound;
 	*/
 
-	int WEIGHT = 25; //FIXME ARBITRARY VALUE
+	float WEIGHT = 0.05; //FIXME ARBITRARY VALUE
 
 	int i;
 	int j;
@@ -143,30 +143,14 @@ ComputeFrequencyHistogram(VacAttrStats* stats, int slot_idx, RangeBound* lowers,
 
 	min = (lowers)->val;
 	max = (uppers+rows-1)->val;
-	
-	// BEGIN TODO EXPERIMENTAL
-	int sum_length = 0;
-	for (i=0; i < rows; i++){
-		sum_length += (uppers+i)->val - (lowers+i)->val;
-	}
-	float average;
-	average = sum_length / rows;
-	printf("\n\n AVERAGE : %f", average);
-	printf("\nMIN: %d", min);
-	printf("\nMAX: %d\n", max);
-	
-
-	
 
 
 	// -- CHOOSING THE INTERVAL LENGTH AND THE NUMBER OF INTERVALS -- //
 	length = max - min + 1; 
-	nb_of_intervals = length / (WEIGHT*average / (max-min));
-	if (nb_of_intervals < 1)
-		nb_of_intervals = 1;
-	interval_length = roundUpDivision(length, nb_of_intervals);
-	// Need to readjust the nbr of intervals
+	interval_length = 1 + WEIGHT*length;
 	nb_of_intervals = roundUpDivision(length, interval_length);
+	// Need to readjust values
+	interval_length = roundUpDivision(length, nb_of_intervals);
 	
 	// -- ALLOCATING MEMORY -- //
 	normalized_frequencies_vals = (float8*) palloc(sizeof(float8) * nb_of_intervals);
@@ -544,9 +528,8 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 		++slot_idx;
 		
 		ComputeFrequencyHistogram(stats, slot_idx, temp_lowers, temp_uppers, num_hist); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
-		// ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, num_hist);
+		//ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, samplerows);
 
-		++slot_idx;
 
 		MemoryContextSwitchTo(old_cxt);
 	}

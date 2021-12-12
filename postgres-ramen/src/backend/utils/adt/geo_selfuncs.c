@@ -265,6 +265,7 @@ float8 rangeoverlapsjoinsel_inner(float8* freq_values1, float8* freq_values2, in
         	result = computeSelectivity(freq_values2 + y_low, freq_values1 + x_low, (y_high - y_low) + 1, (x_high - x_low) + 1, interval_length2, interval_length1, min_val2, min_val1);
         printf("\nRESULT rows (sample) : %f", result);  // DEBUG
         result = result / (rows1*rows2);
+        printf("\n\n xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ROWS : %d x %d\n", rows1, rows2);
         printf("\nRESULT percentage : %f", result);  // DEBUG
     }
     if (result > 1)
@@ -292,34 +293,44 @@ float8 computeSelectivity(float8* freq1, float8* freq2, int size1, int size2, in
     printf("\ninter : %d-%d", interval_length1, interval_length2);  // DEBUG
     printf("\nsize : %d-%d", size1, size2);  // DEBUG
 
-	    
-    while(idx_1 < size1 && idx_2 < size2){
-    	if (limit1 < limit2) {
-    		limit1 += interval_length1;
-    		if (limit1 < limit2 + interval_length2)
-    		{
-    			total += freq1[idx_1] * freq2[idx_2] * pow(limit1 - limit2, 2) / length_prod;
-    			printf("\n1 %d limit : %d - %d -> %f - %f", limit1 - limit2, limit1, limit2, freq1[idx_1], freq2[idx_2]); // DEBUG
-    		}
-    		else {
-    			limit1 -= interval_length1;
-    			limit2 += interval_length2;
-    			total += freq1[idx_1] * freq2[idx_2] * length_fact;
-    			printf("\n %d - limit : %d - %d -> %f - %f", interval_length2, limit1, limit2, freq1[idx_1], freq2[idx_2]);  // DEBUG
-    			printf("\n %f %f %f %f", freq1[idx_1] * freq2[idx_2] * length_fact, freq1[idx_1], freq2[idx_2],  length_fact);  // DEBUG
-    			idx_1--;
-    			idx_2++;
-    		}
-    		idx_1++;
-
-    	}
-    	else if (limit2 < limit1) {
-    		limit2 += interval_length2;
-    		total += freq1[idx_1] * freq2[idx_2] * pow(limit2 - limit1, 2) / length_prod;
-    		printf("\n2 %d limit : %d - %d -> %f - %f", limit2 - limit1, limit1, limit2, freq1[idx_1], freq2[idx_2]); // DEBUG
-    		idx_2++;
-
-    	}
+    if (interval_length1==interval_length2 && limit1==limit2) {
+        for (idx_1 = 0; idx_1 < size1; ++idx_1){
+            total += freq1[idx_1] * freq2[idx_1];
+        }
+    }
+    else {
+        while (idx_1 < size1 && idx_2 < size2){
+            printf("aled");
+            if (limit1 < limit2) {
+                limit1 += interval_length1;
+                if (limit1 < limit2 + interval_length2) {
+                    total += freq1[idx_1] * freq2[idx_2] * pow(limit1 - limit2, 2) / length_prod;
+                    printf("\n1 %d limit : %d - %d -> %f - %f", limit1 - limit2, limit1, limit2, freq1[idx_1], freq2[idx_2]); // DEBUG
+                    idx_1++;
+                }        
+                else {
+                    limit1 -= interval_length1;
+                    limit2 += interval_length2;
+                    total += freq1[idx_1] * freq2[idx_2] * length_fact;
+                    printf("\n %d - limit : %d - %d -> %f - %f", interval_length2, limit1, limit2, freq1[idx_1], freq2[idx_2]);  // DEBUG
+                    printf("\n %f %f %f %f", freq1[idx_1] * freq2[idx_2] * length_fact, freq1[idx_1], freq2[idx_2],  length_fact);  // DEBUG
+                    idx_2++;
+                }
+            }
+            else if (limit2 < limit1) {
+                limit2 += interval_length2;
+                total += freq1[idx_1] * freq2[idx_2] * pow(limit2 - limit1, 2) / length_prod;
+                printf("\n2 %d limit : %d - %d -> %f - %f", limit2 - limit1, limit1, limit2, freq1[idx_1], freq2[idx_2]); // DEBUG
+                idx_2++;
+            }
+            else {
+                    limit2 += interval_length2;
+                    total += freq1[idx_1] * freq2[idx_2] * length_fact;
+                    printf("\n %d - limit : %d - %d -> %f - %f", interval_length2, limit1, limit2, freq1[idx_1], freq2[idx_2]);  // DEBUG
+                    printf("\n %f %f %f %f", freq1[idx_1] * freq2[idx_2] * length_fact, freq1[idx_1], freq2[idx_2],  length_fact);  // DEBUG
+                    idx_2++;
+            }
+        }
     } 
     printf("\n\n TOT : %f", total);
     fflush(stdout);  // DEBUG
