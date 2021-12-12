@@ -281,6 +281,10 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			   *uppers;
 	double		total_width = 0;
 
+	//added variable
+	RangeBound* temp_lowers;
+	RangeBound* temp_uppers;
+
 	/* Allocate memory to hold range bounds and lengths of the sample ranges. */
 	lowers = (RangeBound *) palloc(sizeof(RangeBound) * samplerows);
 	uppers = (RangeBound *) palloc(sizeof(RangeBound) * samplerows);
@@ -415,6 +419,9 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 			bound_hist_values = (Datum *) palloc(num_hist * sizeof(Datum));
 
+			temp_lowers = (RangeBound*) palloc(num_hist * sizeof(RangeBound));
+			temp_uppers = (RangeBound*) palloc(num_hist * sizeof(RangeBound));
+
 			/*
 			 * The object of this loop is to construct ranges from first and
 			 * last entries in lowers[] and uppers[] along with evenly-spaced
@@ -433,10 +440,13 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			for (i = 0; i < num_hist; i++) // num_hist: number of row
 			{
 				// szymon: c'est ici qu'on combine les lower & upper histogrammes en 1
+				temp_lowers[i] = lowers[pos];
+				temp_uppers[i] = uppers[pos];
 				bound_hist_values[i] = PointerGetDatum(range_serialize(typcache,
 																	   &lowers[pos],
 																	   &uppers[pos],
 																	   false));
+
 				pos += delta;
 				posfrac += deltafrac;
 				if (posfrac >= (num_hist - 1))
@@ -474,6 +484,7 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 
 			length_hist_values = (Datum *) palloc(num_hist * sizeof(Datum));
 
+
 			/*
 			 * The object of this loop is to copy the first and last lengths[]
 			 * entries along with evenly-spaced values in between. So the i'th
@@ -486,6 +497,8 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 			delta = (non_empty_cnt - 1) / (num_hist - 1);
 			deltafrac = (non_empty_cnt - 1) % (num_hist - 1);
 			pos = posfrac = 0;
+
+			
 
 			for (i = 0; i < num_hist; i++)
 			{
@@ -529,7 +542,10 @@ compute_range_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc,
 		stats->stakind[slot_idx] = STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM;
 
 		++slot_idx;
-		ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, num_hist); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
+		
+		ComputeFrequencyHistogram(stats, slot_idx, temp_lowers, temp_uppers, num_hist); // alex: compute the frequency histogram at next slot_idx, STATISTIC_KIND_FREQUENCY_HISTOGRAM 42
+		// ComputeFrequencyHistogram(stats, slot_idx, lowers, uppers, num_hist);
+
 		++slot_idx;
 
 		MemoryContextSwitchTo(old_cxt);
