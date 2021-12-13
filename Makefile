@@ -6,11 +6,19 @@ szymon:
 	sudo /media/sf_Postgres-RangeTypes/scripts/compile-psql.sh /media/sf_Postgres-RangeTypes/postgres-ramen/ /media/sf_Postgres-RangeTypes/scripts/psql-script.sql
 szymon-timed:
 	clear
-	sudo /media/sf_Postgres-RangeTypes/scripts/compile-psql.sh /media/sf_Postgres-RangeTypes/postgres-ramen/ /media/sf_Postgres-RangeTypes/benchmark/join/test_equal_tables 
+	sudo /media/sf_Postgres-RangeTypes/scripts/compile-psql.sh /media/sf_Postgres-RangeTypes/postgres-ramen/ /media/sf_Postgres-RangeTypes/benchmark/100_1000_10000 
 
 alex:
 	clear
 	sudo /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/compile-psql.sh /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/postgres-ramen /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/psql-script.sql 
+
+alex-live:
+	clear
+	sudo /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/compile-psql.sh /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/postgres-ramen /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/live_test
+
+alex-live-pgsql:
+	clear
+	sudo /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/compile-psql.sh /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/postgres-REL_13_STABLE /home/parallels/Desktop/Parallels_Shared_Folders/Postgres-RangeTypes/scripts/live_test
 	
 alex1:
 	clear
