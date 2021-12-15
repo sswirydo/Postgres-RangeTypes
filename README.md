@@ -1,4 +1,8 @@
 # Postgres-RangeTypes
+## Description
+This project was realised in the context of the H415 Databases Architectutre university course at Université Libre de Bruxelles.
+
+The purpose of this project is to improve the overall scheme of statistics collection of PostgreSQL for range types along with the cardinality estimation for range types (join and restriction selectivites) and also to understand in more detail how a database works.
 
 ## Structure
 ### postgres-REL_13_STABLE
