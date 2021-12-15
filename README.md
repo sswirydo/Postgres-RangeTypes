@@ -25,6 +25,14 @@ Our modified version of postgreSQL. Why ramen? Cause why not, every one loves ra
 #####
 [pg_proc.dat](postgres-ramen/src/include/catalog/pg_proc.dat)
 
+
+### Testing
+In order to test the implementation, you can use the compiling script.
+```bash
+scripts/compile-psql.sh
+```
+You can take inspiration from the Makefile situated in the root folder, in order to make sure you are passing correct arguments to the script.
+
 ### Debug printing
 Instead of printing with printf(...) etc., simply put this line in your code
 ```C
